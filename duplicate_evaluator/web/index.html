@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,271 +8,291 @@
   <meta name="description" content="Local LLM-powered media duplicate detection and management dashboard" />
   <link rel="stylesheet" href="/static/style.css" />
   <!-- Favicon inline SVG -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🎬</text></svg>" />
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🎬</text></svg>" />
 </head>
+
 <body>
 
-<!-- ═══════════════════════════════════════════════════════════
+  <!-- ═══════════════════════════════════════════════════════════
      HEADER
 ══════════════════════════════════════════════════════════════ -->
-<header class="header">
-  <div class="logo">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="2" y="7" width="20" height="15" rx="2" ry="2"/>
-      <polyline points="17 2 12 7 7 2"/>
-    </svg>
-    Duplicate Evaluator
-  </div>
+  <header class="header">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+        <polyline points="17 2 12 7 7 2" />
+      </svg>
+      Duplicate Evaluator
+    </div>
 
-  <div class="header-spacer"></div>
+    <div class="header-spacer"></div>
 
-  <button id="btn-config" class="connection-badge" title="LLM Connection Settings">
-    <span class="connection-dot" id="conn-dot"></span>
-    <span id="conn-label">Disconnected</span>
-    <span style="color:var(--text-muted);margin-left:2px">⚙</span>
-  </button>
-</header>
+    <button id="btn-config" class="connection-badge" title="LLM Connection Settings">
+      <span class="connection-dot" id="conn-dot"></span>
+      <span id="conn-label">Disconnected</span>
+      <span style="color:var(--text-muted);margin-left:2px">⚙</span>
+    </button>
+  </header>
 
-<!-- ═══════════════════════════════════════════════════════════
+  <!-- ═══════════════════════════════════════════════════════════
      MAIN LAYOUT
 ══════════════════════════════════════════════════════════════ -->
-<div class="layout">
+  <div class="layout">
 
-  <!-- ─── LEFT PANEL: Folder Tree ───────────────────────────── -->
-  <aside class="panel-left" id="panel-left">
-    <div class="panel-header">
-      <span>📁</span> Media Folders
-      <button id="btn-refresh-tree" class="btn btn-ghost btn-sm btn-icon" title="Refresh tree" style="margin-left:auto">↺</button>
-    </div>
+    <!-- ─── LEFT PANEL: Folder Tree ───────────────────────────── -->
+    <aside class="panel-left" id="panel-left">
+      <div class="panel-header">
+        <span>📁</span> Media Folders
+        <button id="btn-refresh-tree" class="btn btn-ghost btn-sm btn-icon" title="Refresh tree"
+          style="margin-left:auto">↺</button>
+      </div>
 
-    <!-- Scan Button Repositioned to Top -->
-    <div class="panel-scan-top" style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:0.5rem;flex-shrink:0;">
-      <button id="btn-scan-folder" class="btn btn-primary" style="width:100%" disabled>
-        <span>🔍</span> Scan Selected Folder
-      </button>
-      <div id="scan-progress-log" class="progress-log" style="display:none;margin-top:0.25rem;"></div>
-    </div>
+      <!-- Scan Button Repositioned to Top -->
+      <div class="panel-scan-top"
+        style="padding:0.75rem 1rem;border-bottom:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:0.5rem;flex-shrink:0;">
+        <button id="btn-scan-folder" class="btn btn-primary" style="width:100%" disabled>
+          <span>🔍</span> Scan Selected Folder
+        </button>
+      </div>
 
-    <div class="tree-container" style="flex:1;overflow-y:auto;">
-      <ul id="folder-tree" class="tree-root">
-        <li class="empty-state" style="padding:2rem 1rem;flex-direction:column;align-items:flex-start;justify-content:flex-start">
-          <span class="spinner"></span>
-          <p style="margin-top:0.75rem;font-size:0.78rem">Loading folders…</p>
-        </li>
-      </ul>
-    </div>
+      <div class="tree-container" style="flex:1;overflow-y:auto;">
+        <ul id="folder-tree" class="tree-root">
+          <li class="empty-state"
+            style="padding:2rem 1rem;flex-direction:column;align-items:flex-start;justify-content:flex-start">
+            <span class="spinner"></span>
+            <p style="margin-top:0.75rem;font-size:0.78rem">Loading folders…</p>
+          </li>
+        </ul>
+      </div>
 
-    <!-- Resizer bar for Left Panel -->
-    <div class="resizer-h" id="resizer-left"></div>
-  </aside>
+      <!-- Resizer bar for Left Panel -->
+      <div class="resizer-h" id="resizer-left"></div>
+    </aside>
 
-  <!-- ─── RIGHT PANEL: Report ───────────────────────────────── -->
-  <main class="panel-right">
+    <!-- ─── RIGHT PANEL: Report ───────────────────────────────── -->
+    <main class="panel-right">
 
-    <!-- Tabs -->
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="within" role="tab" id="tab-within">
-        Within Folder
-      </button>
-      <button class="tab" data-tab="cross" role="tab" id="tab-cross">
-        Cross Quality
-      </button>
-      <button class="tab wip" data-tab="lang" role="tab" id="tab-lang" title="Coming soon">
-        Across Languages
-        <span class="tab-chip">🚧</span>
-      </button>
-    </nav>
+      <!-- Tabs -->
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="within" role="tab" id="tab-within">
+          Within Folder
+        </button>
+        <button class="tab" data-tab="cross" role="tab" id="tab-cross">
+          Cross Quality
+        </button>
+        <button class="tab wip" data-tab="lang" role="tab" id="tab-lang" title="Coming soon">
+          Across Languages
+          <span class="tab-chip">🚧</span>
+        </button>
+      </nav>
 
-    <!-- Tab panes -->
-    <div id="pane-within" class="report-panel tab-pane active">
-      <!-- Toolbar -->
-      <div class="report-toolbar" id="toolbar-within" style="display:none">
-        <div style="flex:1;min-width:0">
-          <div class="report-title" id="report-title-within">—</div>
-          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
-            <div class="report-meta" id="report-meta-within"></div>
-            <span id="auto-save-status-within" class="auto-save-status"></span>
+      <!-- Tab panes -->
+      <div id="pane-within" class="report-panel tab-pane active">
+        <!-- Toolbar -->
+        <div class="report-toolbar" id="toolbar-within" style="display:none">
+          <div style="flex:1;min-width:0">
+            <div class="report-title" id="report-title-within">—</div>
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+              <div class="report-meta" id="report-meta-within"></div>
+              <span id="auto-save-status-within" class="auto-save-status"></span>
+            </div>
+          </div>
+          <button id="btn-mark-executed-within" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
+            Executed</button>
+          <button id="btn-rescan-within" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄
+            Rescan</button>
+        </div>
+        <!-- Table -->
+        <div class="table-wrapper" id="table-wrapper-within">
+          <div class="empty-state">
+            <div class="icon">🎬</div>
+            <p>Select an actress folder from the tree on the left, then click <strong>Scan Selected Folder</strong> to
+              analyse duplicates.</p>
           </div>
         </div>
-        <button id="btn-mark-executed-within" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark Executed</button>
-        <button id="btn-rescan-within" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄 Rescan</button>
-      </div>
-      <!-- Table -->
-      <div class="table-wrapper" id="table-wrapper-within">
-        <div class="empty-state">
-          <div class="icon">🎬</div>
-          <p>Select an actress folder from the tree on the left, then click <strong>Scan Selected Folder</strong> to analyse duplicates.</p>
-        </div>
-      </div>
-      <!-- Action bar -->
-      <div class="action-bar" id="action-bar-within" style="display:none">
-        <button id="btn-dry-run" class="btn btn-primary">
-          <span>⏵</span> Dry Run
-        </button>
-        <button id="btn-exec-delete" class="btn btn-danger" style="margin-left:auto">
-          <span>🗑</span> Execute Delete
-        </button>
-        <button id="btn-exec-rename" class="btn btn-danger">
-          <span>✏</span> Execute Rename
-        </button>
-      </div>
-      <!-- Terminal -->
-      <div class="terminal-wrapper" id="terminal-within" style="display:none">
-        <div class="resizer-v" id="resizer-terminal-within"></div>
-        <div class="terminal-header">
-          <div class="terminal-dots">
-            <div class="terminal-dot red"></div>
-            <div class="terminal-dot yellow"></div>
-            <div class="terminal-dot green"></div>
+        <!-- Action bar + terminal resizer -->
+        <div class="action-bar-with-resizer">
+          <div class="action-bar" id="action-bar-within" style="display:none">
+            <button id="btn-dry-run" class="btn btn-primary">
+              <span>⏵</span> Dry Run
+            </button>
+            <button id="btn-exec-delete" class="btn btn-danger" style="margin-left:auto">
+              <span>🗑</span> Execute Delete
+            </button>
+            <button id="btn-exec-rename" class="btn btn-danger">
+              <span>✏</span> Execute Rename
+            </button>
           </div>
-          <span>Terminal Output</span>
-          <button id="btn-clear-terminal" class="btn btn-ghost btn-sm btn-icon" style="margin-left:auto" title="Clear">✕</button>
+          <div class="resizer-v" id="resizer-terminal-within"></div>
         </div>
-        <pre id="terminal-output" class="terminal-output"></pre>
+        <!-- Terminal -->
+        <div class="terminal-wrapper" id="terminal-within" style="display:none">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <div class="terminal-dot red"></div>
+              <div class="terminal-dot yellow"></div>
+              <div class="terminal-dot green"></div>
+            </div>
+            <span>Terminal Output</span>
+            <button id="btn-clear-terminal" class="btn btn-ghost btn-sm btn-icon" style="margin-left:auto"
+              title="Clear">✕</button>
+          </div>
+          <pre id="terminal-output" class="terminal-output"></pre>
+        </div>
       </div>
-    </div>
 
-    <div id="pane-cross" class="report-panel tab-pane" style="display:none">
-      <!-- Toolbar -->
-      <div class="report-toolbar" id="toolbar-cross" style="display:none">
-        <div style="flex:1;min-width:0">
-          <div class="report-title" id="report-title-cross">—</div>
-          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
-            <div class="report-meta" id="report-meta-cross"></div>
-            <span id="auto-save-status-cross" class="auto-save-status"></span>
+      <div id="pane-cross" class="report-panel tab-pane" style="display:none">
+        <!-- Toolbar -->
+        <div class="report-toolbar" id="toolbar-cross" style="display:none">
+          <div style="flex:1;min-width:0">
+            <div class="report-title" id="report-title-cross">—</div>
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+              <div class="report-meta" id="report-meta-cross"></div>
+              <span id="auto-save-status-cross" class="auto-save-status"></span>
+            </div>
+          </div>
+          <button id="btn-cross-mark-executed" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
+            Executed</button>
+          <button id="btn-rescan-cross" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄 Rescan</button>
+        </div>
+        <!-- Table -->
+        <div class="table-wrapper" id="table-wrapper-cross">
+          <div class="empty-state">
+            <div class="icon">🔀</div>
+            <p>Select an actress folder from the tree, then click <strong>Scan Selected Folder</strong> on the <em>Cross
+                Quality</em> tab to find songs duplicated across xhd/hd/sd tiers.</p>
           </div>
         </div>
-        <button id="btn-cross-mark-executed" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark Executed</button>
-        <button id="btn-rescan-cross" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄 Rescan</button>
-      </div>
-      <!-- Table -->
-      <div class="table-wrapper" id="table-wrapper-cross">
-        <div class="empty-state">
-          <div class="icon">🔀</div>
-          <p>Select an actress folder from the tree, then click <strong>Scan Selected Folder</strong> on the <em>Cross Quality</em> tab to find songs duplicated across xhd/hd/sd tiers.</p>
-        </div>
-      </div>
-      <!-- Action bar -->
-      <div class="action-bar" id="action-bar-cross" style="display:none">
-        <button id="btn-cross-dry-run" class="btn btn-primary">
-          <span>⏵</span> Dry Run
-        </button>
-        <button id="btn-cross-exec-delete" class="btn btn-danger" style="margin-left:auto">
-          <span>🗑</span> Execute Delete
-        </button>
-        <button id="btn-cross-exec-rename" class="btn btn-danger">
-          <span>✏</span> Execute Rename
-        </button>
-      </div>
-      <!-- Terminal -->
-      <div class="terminal-wrapper" id="terminal-cross" style="display:none">
-        <div class="resizer-v" id="resizer-terminal-cross"></div>
-        <div class="terminal-header">
-          <div class="terminal-dots">
-            <div class="terminal-dot red"></div>
-            <div class="terminal-dot yellow"></div>
-            <div class="terminal-dot green"></div>
+        <!-- Action bar + terminal resizer -->
+        <div class="action-bar-with-resizer">
+          <div class="action-bar" id="action-bar-cross" style="display:none">
+            <button id="btn-cross-dry-run" class="btn btn-primary">
+              <span>⏵</span> Dry Run
+            </button>
+            <button id="btn-cross-exec-delete" class="btn btn-danger" style="margin-left:auto">
+              <span>🗑</span> Execute Delete
+            </button>
+            <button id="btn-cross-exec-rename" class="btn btn-danger">
+              <span>✏</span> Execute Rename
+            </button>
           </div>
-          <span>Terminal Output</span>
-          <button id="btn-clear-terminal-cross" class="btn btn-ghost btn-sm btn-icon" style="margin-left:auto" title="Clear">✕</button>
+          <div class="resizer-v" id="resizer-terminal-cross"></div>
         </div>
-        <pre id="terminal-output-cross" class="terminal-output"></pre>
+        <!-- Terminal -->
+        <div class="terminal-wrapper" id="terminal-cross" style="display:none">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <div class="terminal-dot red"></div>
+              <div class="terminal-dot yellow"></div>
+              <div class="terminal-dot green"></div>
+            </div>
+            <span>Terminal Output</span>
+            <button id="btn-clear-terminal-cross" class="btn btn-ghost btn-sm btn-icon" style="margin-left:auto"
+              title="Clear">✕</button>
+          </div>
+          <pre id="terminal-output-cross" class="terminal-output"></pre>
+        </div>
       </div>
-    </div>
 
-    <div id="pane-lang" class="report-panel tab-pane" style="display:none">
-      <div class="wip-banner">
-        <div class="wip-badge">🚧 Work In Progress</div>
-        <h2 style="color:var(--text-secondary)">Cross-Language Analysis</h2>
-        <p>This feature will identify duplicate songs that span across multiple language folders. It requires careful cross-folder comparison logic and is currently under development.</p>
+      <div id="pane-lang" class="report-panel tab-pane" style="display:none">
+        <div class="wip-banner">
+          <div class="wip-badge">🚧 Work In Progress</div>
+          <h2 style="color:var(--text-secondary)">Cross-Language Analysis</h2>
+          <p>This feature will identify duplicate songs that span across multiple language folders. It requires careful
+            cross-folder comparison logic and is currently under development.</p>
+        </div>
       </div>
-    </div>
 
-  </main>
-</div>
+    </main>
+  </div>
 
-<!-- ═══════════════════════════════════════════════════════════
+  <!-- ═══════════════════════════════════════════════════════════
      CONFIG MODAL
 ══════════════════════════════════════════════════════════════ -->
-<div class="modal-backdrop" id="config-modal">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <h2 id="modal-title">⚙ LLM Connection</h2>
-    <div class="form-group">
-      <label class="form-label" for="cfg-provider">Provider</label>
-      <select class="form-select" id="cfg-provider">
-        <option value="ollama">Ollama (localhost:11434)</option>
-        <option value="lmstudio">LM Studio (localhost:1234)</option>
-        <option value="llamacpp">llama.cpp (localhost:8000)</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="cfg-base-url">Base URL</label>
-      <input class="form-input" id="cfg-base-url" type="url" placeholder="http://localhost:11434/v1" />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="cfg-model">Model Name</label>
-      <input class="form-input" id="cfg-model" type="text" placeholder="llama3.2" />
-    </div>
-    <div class="form-group">
-      <label class="form-label" for="cfg-batch">Batch Size</label>
-      <input class="form-input" id="cfg-batch" type="number" min="5" max="200" placeholder="50" />
-    </div>
-    <div class="modal-footer">
-      <button id="btn-modal-cancel" class="btn btn-ghost">Cancel</button>
-      <button id="btn-modal-test"   class="btn btn-ghost">Test Connection</button>
-      <button id="btn-modal-save"   class="btn btn-primary">Save</button>
+  <div class="modal-backdrop" id="config-modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">⚙ LLM Connection</h2>
+      <div class="form-group">
+        <label class="form-label" for="cfg-provider">Provider</label>
+        <select class="form-select" id="cfg-provider">
+          <option value="ollama">Ollama (localhost:11434)</option>
+          <option value="lmstudio">LM Studio (localhost:1234)</option>
+          <option value="llamacpp">llama.cpp (localhost:8000)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="cfg-base-url">Base URL</label>
+        <input class="form-input" id="cfg-base-url" type="url" placeholder="http://localhost:11434/v1" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="cfg-model">Model Name</label>
+        <input class="form-input" id="cfg-model" type="text" placeholder="llama3.2" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="cfg-batch">Batch Size</label>
+        <input class="form-input" id="cfg-batch" type="number" min="5" max="200" placeholder="50" />
+      </div>
+      <div class="modal-footer">
+        <button id="btn-modal-cancel" class="btn btn-ghost">Cancel</button>
+        <button id="btn-modal-test" class="btn btn-ghost">Test Connection</button>
+        <button id="btn-modal-save" class="btn btn-primary">Save</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Video Player Overlay -->
-<div class="video-overlay" id="video-overlay" style="display:none">
-  <div class="video-player-container">
-    <div class="video-player-header">
-      <span class="video-player-title" id="video-player-title">Video Player</span>
-      <button class="video-player-close-btn" id="video-close-btn" title="Close Player">✕</button>
-    </div>
-    
-    <div class="video-wrapper">
-      <video id="custom-video-element" preload="metadata"></video>
-      
-      <!-- Custom Video Controls Overlay -->
-      <div class="video-controls">
-        <!-- Progress Bar -->
-        <div class="video-progress-container" id="video-progress-container">
-          <div class="video-progress-bar" id="video-progress-bar"></div>
-          <div class="video-progress-handle" id="video-progress-handle"></div>
-        </div>
-        
-        <div class="video-controls-buttons">
-          <button class="control-btn" id="video-play-btn" title="Play">⏵</button>
-          
-          <span class="video-time-display" id="video-time-display">00:00 / 00:00</span>
-          
-          <div class="video-volume-container">
-            <button class="control-btn" id="video-volume-btn" title="Mute/Unmute">🔊</button>
-            <input type="range" class="volume-slider" id="video-volume-slider" min="0" max="1" step="0.05" value="1">
+  <!-- Video Player Overlay -->
+  <div class="video-overlay" id="video-overlay" style="display:none">
+    <div class="video-player-container">
+      <div class="video-player-header">
+        <span class="video-player-title" id="video-player-title">Video Player</span>
+        <button class="video-player-close-btn" id="video-close-btn" title="Close Player">✕</button>
+      </div>
+
+      <div class="video-wrapper">
+        <video id="custom-video-element" preload="metadata"></video>
+
+        <!-- Custom Video Controls Overlay -->
+        <div class="video-controls">
+          <!-- Progress Bar -->
+          <div class="video-progress-container" id="video-progress-container">
+            <div class="video-progress-bar" id="video-progress-bar"></div>
+            <div class="video-progress-handle" id="video-progress-handle"></div>
           </div>
-          
-          <div style="flex:1"></div>
-          
-          <button class="control-btn" id="video-fullscreen-btn" title="Fullscreen">⛶</button>
-        </div>
 
-        <!-- Video Playback Stats Row -->
-        <div class="video-stats-row" id="video-stats-row">
-          <span class="video-stat-item">Original Resolution: <span id="video-orig-res" class="video-stat-val">—</span></span>
-          <span class="video-stat-divider">|</span>
-          <span class="video-stat-item">Displayed Resolution: <span id="video-disp-res" class="video-stat-val">—</span></span>
+          <div class="video-controls-buttons">
+            <button class="control-btn" id="video-play-btn" title="Play">⏵</button>
+
+            <span class="video-time-display" id="video-time-display">00:00 / 00:00</span>
+
+            <div class="video-volume-container">
+              <button class="control-btn" id="video-volume-btn" title="Mute/Unmute">🔊</button>
+              <input type="range" class="volume-slider" id="video-volume-slider" min="0" max="1" step="0.05" value="1">
+            </div>
+
+            <div style="flex:1"></div>
+
+            <button class="control-btn" id="video-fullscreen-btn" title="Fullscreen">⛶</button>
+          </div>
+
+          <!-- Video Playback Stats Row -->
+          <div class="video-stats-row" id="video-stats-row">
+            <span class="video-stat-item">Original Resolution: <span id="video-orig-res"
+                class="video-stat-val">—</span></span>
+            <span class="video-stat-divider">|</span>
+            <span class="video-stat-item">Displayed Resolution: <span id="video-disp-res"
+                class="video-stat-val">—</span></span>
+          </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Toast container -->
-<div id="toast-container"></div>
+  <!-- Toast container -->
+  <div id="toast-container"></div>
 
-<script src="/static/app.js"></script>
+  <script src="/static/app.js"></script>
 </body>
+
 </html>

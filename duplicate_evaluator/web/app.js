@@ -403,9 +403,13 @@ async function loadReport(folderPath, tab) {
 
 function showEmptyReport(tab, msg) {
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
+  const actionBar = document.getElementById(`action-bar-${tab}`);
   wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>${escHtml(msg)}</p></div>`;
   document.getElementById(`toolbar-${tab}`).style.display = 'none';
-  document.getElementById(`action-bar-${tab}`).style.display = 'none';
+  if (actionBar) {
+    actionBar.style.display = 'none';
+    if (actionBar.parentElement) actionBar.parentElement.style.display = 'none';
+  }
   document.getElementById(`terminal-${tab}`).style.display = 'none';
 }
 
@@ -414,6 +418,7 @@ function renderReport(report, tab) {
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
   const toolbar = document.getElementById(`toolbar-${tab}`);
   const actionBar = document.getElementById(`action-bar-${tab}`);
+  const actionBarWrapper = actionBar ? actionBar.parentElement : null;
   const titleEl = document.getElementById(`report-title-${tab}`);
   const metaEl  = document.getElementById(`report-meta-${tab}`);
 
@@ -431,6 +436,7 @@ function renderReport(report, tab) {
 
   // Toolbar is always shown if report is present
   toolbar.style.display = 'flex';
+  if (actionBarWrapper) actionBarWrapper.style.display = 'flex';
   titleEl.textContent = `${report.actress || report.folder_path} · ${report.mode}`;
   metaEl.innerHTML = `
     <span class="stat-chip total">📁 ${report.total_files_scanned} scanned</span>
@@ -441,7 +447,7 @@ function renderReport(report, tab) {
 
   if (!report.entries || report.entries.length === 0) {
     wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>No flagged files found in this folder. All files appear clean.</p></div>`;
-    actionBar.style.display = 'none';
+    if (actionBarWrapper) actionBarWrapper.style.display = 'none';
     return;
   }
 
@@ -645,9 +651,10 @@ async function startScan(isRescan = false, targetNode = null) {
   const tab = state.activeTab;
   const mode = tab === 'cross' ? 'cross_quality' : 'within_folder';
 
-  const progressLog = document.getElementById('scan-progress-log');
-  progressLog.style.display = 'block';
-  progressLog.textContent = isRescan ? '🔄 Starting rescan…\n' : '🔍 Starting scan…\n';
+  const termWrapper = document.getElementById(`terminal-${tab}`);
+  const termOutput  = document.getElementById(`terminal-output${tab === 'cross' ? '-cross' : ''}`);
+  termWrapper.style.display = 'flex';
+  termOutput.textContent = isRescan ? '🔄 Starting rescan…\n' : '🔍 Starting scan…\n';
 
   document.getElementById('btn-scan-folder').disabled = true;
   showEmptyReport(tab, '');
@@ -657,7 +664,6 @@ async function startScan(isRescan = false, targetNode = null) {
     <div class="empty-state">
       <span class="spinner" style="width:24px;height:24px"></span>
       <p>Agent is analysing files…</p>
-      <div class="progress-log" id="inline-progress-${tab}" style="width:100%;max-width:480px;margin-top:0.5rem"></div>
     </div>`;
 
   try {
@@ -678,22 +684,19 @@ async function startScan(isRescan = false, targetNode = null) {
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data);
       if (msg.type === 'progress') {
-        progressLog.textContent += msg.messages.join('\n') + '\n';
-        progressLog.scrollTop = progressLog.scrollHeight;
-        const inline = document.getElementById(`inline-progress-${tab}`);
-        if (inline) {
-          inline.textContent += msg.messages.join('\n') + '\n';
-          inline.scrollTop = inline.scrollHeight;
-        }
+        termOutput.textContent += msg.messages.join('\n') + '\n';
+        termOutput.scrollTop = termOutput.scrollHeight;
       }
       if (msg.type === 'done') {
         ws.close();
         if (msg.status === 'done') {
-          progressLog.textContent += '✅ Scan complete!\n';
+          termOutput.textContent += '✅ Scan complete!\n';
+          termOutput.scrollTop = termOutput.scrollHeight;
           loadReport(node.path, tab);
           toast('Scan complete!', 'success');
         } else {
-          progressLog.textContent += `❌ Scan failed: ${msg.error}\n`;
+          termOutput.textContent += `❌ Scan failed: ${msg.error}\n`;
+          termOutput.scrollTop = termOutput.scrollHeight;
           toast(msg.error || 'Scan failed', 'error');
           showEmptyReport(tab, `Scan failed: ${msg.error}`);
         }

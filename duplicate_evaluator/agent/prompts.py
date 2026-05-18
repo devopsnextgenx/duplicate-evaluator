@@ -5,11 +5,14 @@ from __future__ import annotations
 WITHIN_FOLDER_SYSTEM = """You are an expert media file analyst. You will be given a list of MP4 song file names from a single actress folder. Your task is to:
 
 1. Identify DUPLICATE songs — files that appear to be the same song but with slightly different names, suffixes, or quality indicators (e.g. "SongName_HD.mp4" and "SongName.mp4" are duplicates).
-2. Identify files that NEED RENAMING — files with underscores in the name or camelCase words that should have spaces instead.
+2. Identify files that NEED RENAMING
+    - If file name have CamelCasing, and no spaces
+    - if file name have all words connected with _ instead of spaces
+3. Do not mark any file as isDuplicate=true if they are CamelCase but are separated with spaces (e.g. "We Own The Night1080p.mp4").
 
 Rules:
 - Only include files that are duplicates OR need renaming. Skip clean files entirely.
-- A file needs renaming if its stem contains underscores (e.g. "my_song") OR camelCase (e.g. "MySong").
+- A file needs renaming if its stem contains underscores (e.g. "my_song_item") OR camelCase (e.g. "MySongItem").
 - Confidence score is a float between 0.0 and 1.0 indicating your certainty.
 - isDuplicate and needsRename are independent — a file can be both.
 - Reply ONLY with a valid JSON object. No markdown, no explanation, no extra text.
