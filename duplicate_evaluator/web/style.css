@@ -798,6 +798,30 @@ tbody td {
   border-color: var(--btn-blue);
 }
 
+/* Similar files popup shown on hover for duplicate rows */
+.similar-popup {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 0.6rem;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  min-width: 220px;
+}
+.similar-popup h4 {
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+.similar-popup ul { list-style: none; margin: 0; padding: 0; }
+.similar-popup li { padding: 0.25rem 0; border-bottom: 1px dashed rgba(255,255,255,0.03); }
+.similar-popup li:last-child { border-bottom: none; }
+.similar-popup .sf-folder { color: var(--text-muted); font-size: 0.78rem; margin-right: 0.35rem; }
+.similar-popup .sf-fname { font-family: var(--font-mono); font-size: 0.82rem; }
+
 .btn-primary:hover {
   background: var(--btn-blue-hover);
   border-color: var(--btn-blue-hover);

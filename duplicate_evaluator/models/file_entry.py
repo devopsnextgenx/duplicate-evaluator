@@ -55,6 +55,7 @@ class LLMFileResult(BaseModel):
     needs_rename: bool = False
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason: str = ""
+    similar_files: list[dict] = Field(default_factory=list)
 
 
 class LLMBatchResponse(BaseModel):
@@ -85,6 +86,7 @@ class ReportEntry(BaseModel):
     needs_rename: bool = False
     confidence: float = 0.0
     reason: str = ""
+    similar_files: list[dict] = Field(default_factory=list)
     suggested_action: ActionType = ActionType.KEEP
     deleted: bool = False
 

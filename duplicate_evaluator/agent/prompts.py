@@ -25,7 +25,10 @@ Response format:
       "isDuplicate": true,
       "needsRename": false,
       "confidence": 0.95,
-      "reason": "Brief explanation"
+      "reason": "Brief explanation",
+      "similar_files": [
+        {"folder": "hd", "filename": "similar name song.mp4"}
+      ]
     }
   ]
 }
@@ -56,7 +59,11 @@ Response format:
       "isDuplicate": true,
       "needsRename": false,
       "confidence": 0.92,
-      "reason": "Same song exists in xhd tier at higher quality"
+      "reason": "Same song exists in xhd tier at higher quality",
+      "similar_files": [
+        {"folder": "xhd", "filename": "Same song - xhd.mp4"},
+        {"folder": "sd", "filename": "Same song - sd.mp4"}
+      ]
     }
   ]
 }

@@ -25,7 +25,7 @@ def _compute_rename(path: Path) -> Path:
 
     # Underscores → spaces
     result = stem.replace("_", " ")
-    result = stem.replace("-", " ")
+    result = result.replace("-", " ")
 
     # camelCase split: insert space before uppercase preceded by lowercase
     result = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", result)

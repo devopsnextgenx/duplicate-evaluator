@@ -215,6 +215,7 @@ def merge_node(state: AgentState) -> dict:
                 needs_rename=needs_rename,
                 confidence=confidence,
                 reason=reason,
+                similar_files=llm_r.similar_files if llm_r else [],
                 suggested_action=suggested,
             )
         )
@@ -269,6 +270,7 @@ def _parse_llm_response(raw: str) -> LLMBatchResponse:
                     needs_rename=f.get("needsRename", f.get("needs_rename", False)),
                     confidence=float(f.get("confidence", 0.0)),
                     reason=f.get("reason", ""),
+                    similar_files=f.get("similar_files", f.get("similarFiles", [])),
                 )
             )
         return LLMBatchResponse(files=normalised_files)
