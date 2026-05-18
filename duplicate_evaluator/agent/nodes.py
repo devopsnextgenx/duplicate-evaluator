@@ -119,7 +119,6 @@ def llm_node(state: AgentState) -> dict:
                 [SystemMessage(content=WITHIN_FOLDER_SYSTEM), HumanMessage(content=user_msg)]
             )
             raw = response.content if hasattr(response, "content") else str(response)
-            logger.info(f"LLM Response: {raw}")
             batch_result = _parse_llm_response(raw)
             all_results.extend(batch_result.files)
             messages.append(f"✅ Batch {idx}: {len(batch_result.files)} findings")
