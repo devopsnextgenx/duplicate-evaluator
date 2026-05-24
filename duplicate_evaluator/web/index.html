@@ -70,117 +70,99 @@
         </ul>
       </div>
 
-      <!-- Resizer bar for Left Panel -->
-      <div class="resizer-h" id="resizer-left"></div>
     </aside>
 
     <!-- ─── RIGHT PANEL: Report ───────────────────────────────── -->
     <main class="panel-right">
+      <div class="pane-parent">
 
-      <!-- Tabs -->
-      <nav class="tabs" role="tablist">
-        <button class="tab active" data-tab="within" role="tab" id="tab-within">
-          Within Folder
-        </button>
-        <button class="tab" data-tab="cross" role="tab" id="tab-cross">
-          Cross Quality
-        </button>
-        <button class="tab wip" data-tab="lang" role="tab" id="tab-lang" title="Coming soon">
-          Across Languages
-          <span class="tab-chip">🚧</span>
-        </button>
-      </nav>
-
-      <!-- Tab panes -->
-      <div id="pane-within" class="report-panel tab-pane active">
-        <!-- Toolbar -->
-        <div class="report-toolbar" id="toolbar-within" style="display:none">
-          <div style="flex:1;min-width:0">
-            <div class="report-title" id="report-title-within">—</div>
-            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
-              <div class="report-meta" id="report-meta-within"></div>
-              <span id="auto-save-status-within" class="auto-save-status"></span>
+        <!-- Tabs -->
+        <nav class="tabs" role="tablist">
+          <button class="tab active" data-tab="within" role="tab" id="tab-within">
+            Within Folder
+          </button>
+          <button class="tab" data-tab="cross" role="tab" id="tab-cross">
+            Cross Quality
+          </button>
+          <button class="tab wip" data-tab="lang" role="tab" id="tab-lang" title="Coming soon">
+            Across Languages
+            <span class="tab-chip">🚧</span>
+          </button>
+        </nav>
+        <!-- Tab panes -->
+        <div id="pane-within" class="report-panel tab-pane active">
+          <!-- Toolbar -->
+          <div class="report-toolbar" id="toolbar-within" style="display:none">
+            <div style="flex:1;min-width:0">
+              <div class="report-title" id="report-title-within">—</div>
+              <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+                <div class="report-meta" id="report-meta-within"></div>
+                <span id="auto-save-status-within" class="auto-save-status"></span>
+              </div>
+            </div>
+            <button id="btn-mark-executed-within" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
+              Executed</button>
+            <button id="btn-rescan-within" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄
+              Rescan</button>
+          </div>
+          <!-- Table -->
+          <div class="table-wrapper" id="table-wrapper-within">
+            <div class="empty-state">
+              <div class="icon">🎬</div>
+              <p>Select an actress folder from the tree on the left, then click <strong>Scan Selected Folder</strong> to
+                analyse duplicates.</p>
             </div>
           </div>
-          <button id="btn-mark-executed-within" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
-            Executed</button>
-          <button id="btn-rescan-within" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄
-            Rescan</button>
         </div>
-        <!-- Table -->
-        <div class="table-wrapper" id="table-wrapper-within">
-          <div class="empty-state">
-            <div class="icon">🎬</div>
-            <p>Select an actress folder from the tree on the left, then click <strong>Scan Selected Folder</strong> to
-              analyse duplicates.</p>
-          </div>
-        </div>
-        <!-- Action bar + terminal resizer -->
-        <div class="action-bar-with-resizer">
-          <div class="action-bar" id="action-bar-within" style="display:none">
-            <button id="btn-dry-run" class="btn btn-primary">
-              <span>⏵</span> Dry Run
-            </button>
-            <button id="btn-exec-delete" class="btn btn-danger" style="margin-left:auto">
-              <span>🗑</span> Execute Delete
-            </button>
-            <button id="btn-exec-rename" class="btn btn-danger">
-              <span>✏</span> Execute Rename
-            </button>
-          </div>
-          <div class="resizer-v" id="resizer-terminal-within"></div>
-        </div>
-      </div>
 
-      <div id="pane-cross" class="report-panel tab-pane" style="display:none">
-        <!-- Toolbar -->
-        <div class="report-toolbar" id="toolbar-cross" style="display:none">
-          <div style="flex:1;min-width:0">
-            <div class="report-title" id="report-title-cross">—</div>
-            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
-              <div class="report-meta" id="report-meta-cross"></div>
-              <span id="auto-save-status-cross" class="auto-save-status"></span>
+        <div id="pane-cross" class="report-panel tab-pane" style="display:none">
+          <!-- Toolbar -->
+          <div class="report-toolbar" id="toolbar-cross" style="display:none">
+            <div style="flex:1;min-width:0">
+              <div class="report-title" id="report-title-cross">—</div>
+              <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+                <div class="report-meta" id="report-meta-cross"></div>
+                <span id="auto-save-status-cross" class="auto-save-status"></span>
+              </div>
+            </div>
+            <button id="btn-cross-mark-executed" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
+              Executed</button>
+            <button id="btn-rescan-cross" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄 Rescan</button>
+          </div>
+          <!-- Table -->
+          <div class="table-wrapper" id="table-wrapper-cross">
+            <div class="empty-state">
+              <div class="icon">🔀</div>
+              <p>Select an actress folder from the tree, then click <strong>Scan Selected Folder</strong> on the <em>Cross
+                  Quality</em> tab to find songs duplicated across xhd/hd/sd tiers.</p>
             </div>
           </div>
-          <button id="btn-cross-mark-executed" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
-            Executed</button>
-          <button id="btn-rescan-cross" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄 Rescan</button>
         </div>
-        <!-- Table -->
-        <div class="table-wrapper" id="table-wrapper-cross">
-          <div class="empty-state">
-            <div class="icon">🔀</div>
-            <p>Select an actress folder from the tree, then click <strong>Scan Selected Folder</strong> on the <em>Cross
-                Quality</em> tab to find songs duplicated across xhd/hd/sd tiers.</p>
+
+        <div id="pane-lang" class="report-panel tab-pane" style="display:none">
+          <div class="wip-banner">
+            <div class="wip-badge">🚧 Work In Progress</div>
+            <h2 style="color:var(--text-secondary)">Cross-Language Analysis</h2>
+            <p>This feature will identify duplicate songs that span across multiple language folders. It requires careful
+              cross-folder comparison logic and is currently under development.</p>
           </div>
         </div>
-        <!-- Action bar + terminal resizer -->
-        <div class="action-bar-with-resizer">
-          <div class="action-bar" id="action-bar-cross" style="display:none">
-            <button id="btn-cross-dry-run" class="btn btn-primary">
-              <span>⏵</span> Dry Run
-            </button>
-            <button id="btn-cross-exec-delete" class="btn btn-danger" style="margin-left:auto">
-              <span>🗑</span> Execute Delete
-            </button>
-            <button id="btn-cross-exec-rename" class="btn btn-danger">
-              <span>✏</span> Execute Rename
-            </button>
-          </div>
-          <div class="resizer-v" id="resizer-terminal-cross"></div>
-        </div>
       </div>
-
-      <div id="pane-lang" class="report-panel tab-pane" style="display:none">
-        <div class="wip-banner">
-          <div class="wip-badge">🚧 Work In Progress</div>
-          <h2 style="color:var(--text-secondary)">Cross-Language Analysis</h2>
-          <p>This feature will identify duplicate songs that span across multiple language folders. It requires careful
-            cross-folder comparison logic and is currently under development.</p>
-        </div>
-      </div>
-
+      <!-- Terminal Resizer and Terminal -->
+      <div class="terminal-resizer" id="terminal-resizer"></div>
       <div class="terminal-wrapper terminal-global" id="terminal-global">
+        <!-- Action bar -->
+        <div class="action-bar" id="action-bar" style="display:none">
+          <button id="btn-dry-run" class="btn btn-primary">
+            <span>⏵</span> Dry Run
+          </button>
+          <button id="btn-exec-delete" class="btn btn-danger" style="margin-left:auto">
+            <span>🗑</span> Execute Delete
+          </button>
+          <button id="btn-exec-rename" class="btn btn-danger">
+            <span>✏</span> Execute Rename
+          </button>
+        </div>
         <div class="terminal-header">
           <div class="terminal-dots">
             <div class="terminal-dot red"></div>
@@ -193,7 +175,6 @@
         </div>
         <pre id="terminal-output-global" class="terminal-output"></pre>
       </div>
-
     </main>
   </div>
 

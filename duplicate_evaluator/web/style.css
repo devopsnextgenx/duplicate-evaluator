@@ -59,6 +59,12 @@
   /* Transitions */
   --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Terminal height */
+  --terminal-height: 200px;
+
+  /* Sidebar width */
+  --sidebar-width: 280px;
 }
 
 /* ── Reset & Base ──────────────────────────────────────────── */
@@ -200,10 +206,10 @@ h3 {
 
 /* ── Left Panel — Folder Tree ──────────────────────────────── */
 .panel-left {
-  width: 280px;
+  width: var(--sidebar-width);
   min-width: 200px;
   max-width: 400px;
-  height: 100vh;
+  height: 100%;
   max-height: 100%;
   display: flex;
   flex-direction: column;
@@ -218,21 +224,43 @@ h3 {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
   font-weight: 600;
   font-size: 0.8rem;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Panel scan section at top */
+.panel-scan-top {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
 .tree-container {
   flex: 1;
-  overflow-y: scroll;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.5rem 0;
+  min-height: 0;
 }
 
-/* Tree nodes */
+/* Tree root and nodes */
+.tree-root {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  min-height: 100%;
+}
+
 .tree-node {
   list-style: none;
 }
@@ -253,14 +281,6 @@ h3 {
 
 .tree-label:hover {
   background: var(--bg-hover);
-}
-
-.tree-label .tree-checkbox {
-  width: 1rem;
-  height: 1rem;
-  margin-right: 0.5rem;
-  accent-color: var(--accent-blue);
-  flex-shrink: 0;
 }
 
 .tree-label.selected {
@@ -319,22 +339,13 @@ h3 {
 }
 
 /* Indent levels */
-.tree-level-language>.tree-label {
+.tree-level-language .tree-label {
   font-weight: 600;
   color: var(--accent-purple);
 }
 
-.tree-level-quality>.tree-label {
+.tree-level-quality .tree-label {
   color: var(--accent-yellow);
-}
-
-/* Scan button in tree footer */
-.panel-footer {
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--border-subtle);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
 }
 
 /* ── Right Panel — Report ──────────────────────────────────── */
@@ -346,6 +357,17 @@ h3 {
   height: 100%;
   max-height: 100%;
   background: var(--bg-base);
+  position: relative;
+}
+
+.pane-parent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  /* Account for terminal height so pane-parent ends above terminal */
+  margin-bottom: var(--terminal-height);
 }
 
 /* ── Tabs ──────────────────────────────────────────────────── */
@@ -474,36 +496,27 @@ h3 {
 /* ── Table ─────────────────────────────────────────────────── */
 .table-wrapper {
   flex: 1;
-  max-height: 60vh;
   overflow-y: auto;
   overflow-x: auto;
   padding: 0;
   min-height: 0;
-  scrollbar-width: none;
-  /* Hide scrollbars for Firefox */
-  -ms-overflow-style: none;
-  /* Hide scrollbars for IE/Edge */
 }
 
-.table-wrapper::-webkit-scrollbar {
-  display: none;
-  /* Hide scrollbars for Chrome/Safari/Opera */
-}
-
-table {
+/* Report table specific styles */
+.report-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.8rem;
 }
 
-thead {
+.report-table thead {
   position: sticky;
   top: 0;
   z-index: 10;
   background: var(--bg-elevated);
 }
 
-thead th {
+.report-table thead th {
   padding: 0.6rem 0.75rem;
   text-align: left;
   font-weight: 600;
@@ -515,24 +528,24 @@ thead th {
   letter-spacing: 0.4px;
 }
 
-tbody tr {
+.report-table tbody tr {
   border-bottom: 1px solid var(--border-subtle);
   transition: background var(--transition);
 }
 
-tbody tr:hover {
+.report-table tbody tr:hover {
   background: var(--bg-surface);
 }
 
-tbody tr.is-duplicate {
+.report-table tbody tr.is-duplicate {
   background: color-mix(in srgb, var(--accent-red-bg) 30%, transparent);
 }
 
-tbody tr.needs-rename {
+.report-table tbody tr.needs-rename {
   background: color-mix(in srgb, var(--accent-yellow-bg) 30%, transparent);
 }
 
-tbody td {
+.report-table tbody td {
   padding: 0.55rem 0.75rem;
   vertical-align: middle;
   color: var(--text-primary);
@@ -545,13 +558,6 @@ tbody td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.td-thumb {
-  width: 50px;
-  text-align: center;
-  color: var(--text-muted);
-  font-size: 1.2rem;
 }
 
 .td-size {
@@ -643,19 +649,19 @@ tbody td {
   user-select: none;
 }
 
-.action-radio[value="delete"]:checked+.action-label {
+.action-radio[value="delete"]:checked + .action-label {
   background: var(--accent-red-bg);
   border-color: var(--accent-red);
   color: var(--accent-red);
 }
 
-.action-radio[value="rename"]:checked+.action-label {
+.action-radio[value="rename"]:checked + .action-label {
   background: var(--accent-yellow-bg);
   border-color: var(--accent-yellow);
   color: var(--accent-yellow);
 }
 
-.action-radio[value="keep"]:checked+.action-label {
+.action-radio[value="keep"]:checked + .action-label {
   background: var(--accent-green-bg);
   border-color: var(--accent-green);
   color: var(--accent-green);
@@ -667,12 +673,6 @@ tbody td {
 }
 
 /* ── Action Bar ─────────────────────────────────────────────── */
-.action-bar-with-resizer {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-}
-
 .action-bar {
   display: flex;
   align-items: center;
@@ -686,30 +686,45 @@ tbody td {
   white-space: nowrap;
 }
 
-/* Resizer in-between the action bar and terminal output */
-.action-bar-with-resizer .resizer-v {
-  height: 6px;
-  width: 100%;
-  cursor: row-resize;
-  background: var(--border);
-  transition: background var(--transition);
-}
-
-.action-bar-with-resizer .resizer-v:hover,
-.action-bar-with-resizer .resizer-v:active {
-  background: var(--accent-blue);
-}
-
 /* ── Terminal Output ───────────────────────────────────────── */
 .terminal-wrapper {
   flex: 0 0 auto;
-  height: 20vh;
-  min-height: 12rem;
-  max-height: 50vh;
+  height: var(--terminal-height);
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--border);
   background: #0a0c0f;
+}
+
+.terminal-global {
+  position: fixed;
+  /* Position exactly below pane-parent (which has margin-bottom: var(--terminal-height)) */
+  /* pane-parent is inside panel-right, so we align with panel-right */
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  width: auto;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.terminal-resizer {
+  position: fixed;
+  left: var(--sidebar-width);
+  right: 0;
+  bottom: var(--terminal-height);
+  height: 6px;
+  width: auto;
+  background: var(--border);
+  cursor: row-resize;
+  z-index: 55;
+  transition: background var(--transition);
+}
+
+.terminal-resizer:hover,
+.terminal-resizer.active {
+  background: var(--accent-blue);
 }
 
 .terminal-header {
@@ -760,26 +775,6 @@ tbody td {
   word-break: break-all;
 }
 
-.terminal-output .t-success {
-  color: #3fb950;
-}
-
-.terminal-output .t-error {
-  color: #f85149;
-}
-
-.terminal-output .t-warn {
-  color: #d29922;
-}
-
-.terminal-output .t-info {
-  color: #58a6ff;
-}
-
-.terminal-output .t-dim {
-  color: var(--text-muted);
-}
-
 /* ── Buttons ────────────────────────────────────────────────── */
 .btn {
   display: inline-flex;
@@ -809,30 +804,6 @@ tbody td {
   color: #fff;
   border-color: var(--btn-blue);
 }
-
-/* Similar files popup shown on hover for duplicate rows */
-.similar-popup {
-  position: fixed;
-  z-index: 9999;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  padding: 0.6rem;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
-  font-size: 0.82rem;
-  color: var(--text-primary);
-  min-width: 220px;
-}
-.similar-popup h4 {
-  margin-bottom: 0.35rem;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-}
-.similar-popup ul { list-style: none; margin: 0; padding: 0; }
-.similar-popup li { padding: 0.25rem 0; border-bottom: 1px dashed rgba(255,255,255,0.03); }
-.similar-popup li:last-child { border-bottom: none; }
-.similar-popup .sf-folder { color: var(--text-muted); font-size: 0.78rem; margin-right: 0.35rem; }
-.similar-popup .sf-fname { font-family: var(--font-mono); font-size: 0.82rem; }
 
 .btn-primary:hover {
   background: var(--btn-blue-hover);
@@ -868,6 +839,52 @@ tbody td {
 
 .btn-icon {
   padding: 0.35rem 0.5rem;
+}
+
+/* Similar files popup shown on hover for duplicate rows */
+.similar-popup {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 0.6rem;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  min-width: 220px;
+}
+
+.similar-popup h4 {
+  margin-bottom: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.similar-popup ul { 
+  list-style: none; 
+  margin: 0; 
+  padding: 0; 
+}
+
+.similar-popup li { 
+  padding: 0.25rem 0; 
+  border-bottom: 1px dashed rgba(255,255,255,0.03); 
+}
+
+.similar-popup li:last-child { 
+  border-bottom: none; 
+}
+
+.similar-popup .sf-folder { 
+  color: var(--text-muted); 
+  font-size: 0.78rem; 
+  margin-right: 0.35rem; 
+}
+
+.similar-popup .sf-fname { 
+  font-family: var(--font-mono); 
+  font-size: 0.82rem; 
 }
 
 /* ── Empty / Loading States ─────────────────────────────────── */
@@ -910,19 +927,6 @@ tbody td {
   to {
     transform: rotate(360deg);
   }
-}
-
-/* Progress log in panel */
-.progress-log {
-  max-height: 120px;
-  overflow-y: auto;
-  padding: 0.5rem 0.75rem;
-  background: var(--bg-base);
-  border-radius: var(--radius-md);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  line-height: 1.8;
-  color: var(--text-secondary);
 }
 
 /* ── Toast notifications ────────────────────────────────────── */
@@ -972,7 +976,6 @@ tbody td {
     opacity: 0;
     transform: translateX(20px);
   }
-
   to {
     opacity: 1;
     transform: translateX(0);
@@ -1042,13 +1045,8 @@ tbody td {
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes scaleIn {
@@ -1056,7 +1054,6 @@ tbody td {
     transform: scale(0.96);
     opacity: 0;
   }
-
   to {
     transform: scale(1);
     opacity: 1;
@@ -1112,42 +1109,15 @@ tbody td {
     width: 220px;
   }
 
+  :root {
+    --sidebar-width: 220px;
+  }
+
   .td-filename {
     max-width: 160px;
   }
 }
 
-/* ── Resizer bars ─────────────────────────────────────────── */
-.resizer-h {
-  width: 6px;
-  height: 100%;
-  position: absolute;
-  right: 0;
-  top: 0;
-  cursor: col-resize;
-  z-index: 10;
-  background: transparent;
-  transition: background var(--transition);
-}
-
-.resizer-h:hover,
-.resizer-h:active {
-  background: var(--accent-blue);
-}
-
-.resizer-v {
-  height: 6px;
-  width: 100%;
-  cursor: row-resize;
-  z-index: 10;
-  background: var(--border);
-  transition: background var(--transition);
-}
-
-.resizer-v:hover,
-.resizer-v:active {
-  background: var(--accent-blue);
-}
 
 /* ── Scan Status Dot ───────────────────────────────────────── */
 .scan-status-dot {
@@ -1393,10 +1363,6 @@ tbody td {
   outline: none;
   cursor: pointer;
   accent-color: var(--accent-blue);
-}
-
-.progress-log {
-  max-height: 200px !important;
 }
 
 /* ── Auto-save Status Badge ───────────────────────────────── */

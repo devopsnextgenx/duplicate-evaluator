@@ -156,17 +156,13 @@ function renderTree(nodes, parentEl, depth) {
 
     let dotHtml = '';
     let rescanHtml = '';
-    let checkboxHtml = '';
     if (node.type === 'actress') {
       const status = node.scan_status || 'none';
       dotHtml = `<span class="scan-status-dot ${status}" title="Status: ${status}"></span>`;
       rescanHtml = `<button class="rescan-btn" title="Rescan folder">🔄</button>`;
-      const checked = state.selectedNodes.has(node.path) ? 'checked' : '';
-      checkboxHtml = `<input type="checkbox" class="tree-checkbox" data-path="${escHtml(node.path)}" data-name="${escHtml(node.name)}" data-language="${escHtml(node.language || '')}" data-quality="${escHtml(node.quality || '')}" data-actress="${escHtml(node.actress || '')}" ${checked} title="Select folder for bulk scan" />`;
     }
 
     label.innerHTML = `
-      ${checkboxHtml}
       ${hasChildren ? '<span class="tree-chevron">▶</span>' : '<span style="width:0.8em;display:inline-block"></span>'}
       ${dotHtml}
       <span class="icon">${icon}</span>
@@ -182,69 +178,92 @@ function renderTree(nodes, parentEl, depth) {
     li.appendChild(label);
 
     if (node.type === 'actress') {
-      const checkbox = label.querySelector('.tree-checkbox');
-      if (checkbox) {
-        checkbox.addEventListener('click', (e) => e.stopPropagation());
-
-        // Handle click for shift-range and ctrl/meta multi-select
-        checkbox.addEventListener('click', (e) => {
-          const cb = e.target;
-          const isChecked = cb.checked;
-          const path = cb.dataset.path;
-
-          const allCBs = Array.from(document.querySelectorAll('.tree-checkbox'));
-
-          if (e.shiftKey && state.lastSelectedPath) {
-            // Determine range between lastSelectedPath and current
-            const paths = allCBs.map(x => x.dataset.path);
-            const a = paths.indexOf(state.lastSelectedPath);
-            const b = paths.indexOf(path);
-            if (a !== -1 && b !== -1) {
-              const [start, end] = a < b ? [a, b] : [b, a];
-              for (let i = start; i <= end; i++) {
-                const other = allCBs[i];
-                other.checked = isChecked;
-                const p = other.dataset.path;
-                const name = other.dataset.name || p;
-                const nodeObj = { path: p, name, language: other.dataset.language || '', quality: other.dataset.quality || null, actress: other.dataset.actress || name };
-                const lab = other.closest('.tree-label');
-                if (isChecked) {
-                  state.selectedNodes.set(p, nodeObj);
-                  if (lab) lab.classList.add('selected');
-                } else {
-                  state.selectedNodes.delete(p);
-                  if (lab) lab.classList.remove('selected');
-                }
-              }
-            }
-          } else if (e.ctrlKey || e.metaKey) {
-            // toggle single without affecting lastSelectedPath
-            if (isChecked) {
-              const name = cb.dataset.name || path;
-              const nodeObj = { path, name, language: cb.dataset.language || '', quality: cb.dataset.quality || null, actress: cb.dataset.actress || name };
-              state.selectedNodes.set(path, nodeObj);
-              label.classList.add('selected');
-            } else {
-              state.selectedNodes.delete(path);
-              label.classList.remove('selected');
-            }
-            state.lastSelectedPath = path;
+      // Handle selection by clicking on row
+      label.style.cursor = 'pointer';
+      label.addEventListener('click', (e) => {
+        e.stopPropagation();
+        
+        // Check if the click was on the rescan button
+        if (e.target.classList && e.target.classList.contains('rescan-btn')) {
+          selectNode(node, label);
+          startScan(true, node);
+          return;
+        }
+        
+        // Handle modifier keys for multi-select
+        if (e.ctrlKey || e.metaKey) {
+          // Toggle this node in selectedNodes
+          const path = node.path;
+          if (state.selectedNodes.has(path)) {
+            state.selectedNodes.delete(path);
+            label.classList.remove('selected');
           } else {
-            // simple click: select or deselect single and update lastSelectedPath
-            if (isChecked) {
-              const name = cb.dataset.name || path;
-              const nodeObj = { path, name, language: cb.dataset.language || '', quality: cb.dataset.quality || null, actress: cb.dataset.actress || name };
-              state.selectedNodes.set(path, nodeObj);
-              label.classList.add('selected');
-            } else {
-              state.selectedNodes.delete(path);
-              label.classList.remove('selected');
-            }
-            state.lastSelectedPath = path;
+            state.selectedNodes.set(path, node);
+            label.classList.add('selected');
           }
-
+          state.lastSelectedPath = path;
           updateSelectionSummary();
           updateScanButton();
+          return;
+        }
+        
+        if (e.shiftKey && state.lastSelectedPath) {
+          // Range select between lastSelectedPath and current
+          const allLabels = Array.from(document.querySelectorAll('.tree-label'));
+          const actressLabels = allLabels.filter(lbl => {
+            const li = lbl.closest('li');
+            return li && li.classList.contains('tree-level-actress');
+          });
+          
+          const paths = actressLabels.map(lbl => lbl.querySelector('.name')?.getAttribute('title') || '');
+          const a = paths.indexOf(state.lastSelectedPath);
+          const b = paths.indexOf(node.path);
+          
+          if (a !== -1 && b !== -1) {
+            const [start, end] = a < b ? [a, b] : [b, a];
+            for (let i = start; i <= end; i++) {
+              const otherLabel = actressLabels[i];
+              const otherLi = otherLabel.closest('li');
+              const otherNode = getNodeFromLabel(otherLabel);
+              if (otherNode) {
+                state.selectedNodes.set(otherNode.path, otherNode);
+                otherLabel.classList.add('selected');
+              }
+            }
+          }
+          state.lastSelectedPath = node.path;
+          updateSelectionSummary();
+          updateScanButton();
+          return;
+        }
+        
+        // Default single-select behaviour
+        document.querySelectorAll('.tree-label.active').forEach(el => el.classList.remove('active'));
+        label.classList.add('active');
+        
+        // Clear previous multi-selection
+        document.querySelectorAll('.tree-label.selected').forEach(el => el.classList.remove('selected'));
+        state.selectedNodes.clear();
+        
+        state.selectedNode = node;
+        state.lastSelectedPath = node.path;
+        updateScanButton();
+        
+        // If a report already exists, auto-load it for the active tab
+        if (node.has_report) {
+          loadReport(node.path, state.activeTab);
+        } else {
+          showEmptyReport(state.activeTab, `No report found. Click "Scan Selected Folder" to analyse.`);
+        }
+      });
+      
+      // Bind rescan button click
+      const rescanBtn = label.querySelector('.rescan-btn');
+      if (rescanBtn) {
+        rescanBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectNode(node, label);
+          startScan(true, node);
         });
       }
     }
@@ -275,33 +294,19 @@ function renderTree(nodes, parentEl, depth) {
         } else {
           state.expandedPaths.delete(node.path);
         }
-
-        if (node.type === 'actress') {
-          selectNode(node, label, e);
-        }
       });
-    }
-
-    if (node.type === 'actress') {
-      label.style.cursor = 'pointer';
-      label.addEventListener('click', (e) => {
-        e.stopPropagation();
-        selectNode(node, label, e);
-      });
-
-      // Bind rescan button click
-      const rescanBtn = label.querySelector('.rescan-btn');
-      if (rescanBtn) {
-        rescanBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          selectNode(node, label);
-          startScan(true, node);
-        });
-      }
     }
 
     parentEl.appendChild(li);
   });
+}
+
+function getNodeFromLabel(label) {
+  const nameSpan = label.querySelector('.name');
+  const path = nameSpan?.getAttribute('title');
+  const name = nameSpan?.textContent;
+  if (!path) return null;
+  return { path, name };
 }
 
 function getIcon(node) {
@@ -314,71 +319,16 @@ function getIcon(node) {
   return '📁';
 }
 
-function selectNode(node, labelEl, evt = null) {
-  // Modifier keys: ctrl/meta = toggle, shift = range, otherwise single-select
-  if (evt && (evt.ctrlKey || evt.metaKey)) {
-    // Toggle this node in selectedNodes
-    const path = node.path;
-    const cb = labelEl.querySelector('.tree-checkbox');
-    if (state.selectedNodes.has(path)) {
-      state.selectedNodes.delete(path);
-      if (cb) cb.checked = false;
-      labelEl.classList.remove('selected');
-    } else {
-      state.selectedNodes.set(path, node);
-      if (cb) cb.checked = true;
-      labelEl.classList.add('selected');
-    }
-    state.lastSelectedPath = path;
-    updateSelectionSummary();
-    updateScanButton();
-    return;
-  }
-
-  if (evt && evt.shiftKey && state.lastSelectedPath) {
-    // Range select between lastSelectedPath and current
-    const allCBs = Array.from(document.querySelectorAll('.tree-checkbox'));
-    const paths = allCBs.map(x => x.dataset.path);
-    const a = paths.indexOf(state.lastSelectedPath);
-    const b = paths.indexOf(node.path);
-    if (a !== -1 && b !== -1) {
-      const [start, end] = a < b ? [a, b] : [b, a];
-      for (let i = start; i <= end; i++) {
-        const other = allCBs[i];
-        other.checked = true;
-        const p = other.dataset.path;
-        const name = other.dataset.name || p;
-        const nodeObj = { path: p, name, language: other.dataset.language || '', quality: other.dataset.quality || null, actress: other.dataset.actress || name };
-        state.selectedNodes.set(p, nodeObj);
-        const lab = other.closest('.tree-label');
-        if (lab) lab.classList.add('selected');
-      }
-    }
-    state.lastSelectedPath = node.path;
-    updateSelectionSummary();
-    updateScanButton();
-    return;
-  }
-
-  // Default single-select behaviour: clear multi-selection and mark active node
+function selectNode(node, labelEl) {
   document.querySelectorAll('.tree-label.active').forEach(el => el.classList.remove('active'));
   labelEl.classList.add('active');
-
-  // Clear previous multi-selection
+  
   document.querySelectorAll('.tree-label.selected').forEach(el => el.classList.remove('selected'));
-  document.querySelectorAll('.tree-checkbox').forEach(cb => cb.checked = false);
   state.selectedNodes.clear();
-
+  
   state.selectedNode = node;
   state.lastSelectedPath = node.path;
   updateScanButton();
-
-  // If a report already exists, auto-load it for the active tab
-  if (node.has_report) {
-    loadReport(node.path, state.activeTab);
-  } else {
-    showEmptyReport(state.activeTab, `No report found. Click "Scan Selected Folder" to analyse.`);
-  }
 }
 
 function updateScanButton() {
@@ -587,7 +537,7 @@ async function loadReport(folderPath, tab) {
 
 function showEmptyReport(tab, msg) {
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
-  const actionBar = document.getElementById(`action-bar-${tab}`);
+  const actionBar = document.getElementById(`action-bar`);
   wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>${escHtml(msg)}</p></div>`;
   const toolbarEl = document.getElementById(`toolbar-${tab}`);
   if (toolbarEl) toolbarEl.style.display = 'none';
@@ -606,7 +556,7 @@ function showEmptyReport(tab, msg) {
 function renderReport(report, tab) {
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
   const toolbar = document.getElementById(`toolbar-${tab}`);
-  const actionBar = document.getElementById(`action-bar-${tab}`);
+  const actionBar = document.getElementById(`action-bar`);
   const actionBarWrapper = actionBar ? actionBar.parentElement : null;
   const titleEl = document.getElementById(`report-title-${tab}`);
   const metaEl  = document.getElementById(`report-meta-${tab}`);
@@ -642,7 +592,7 @@ function renderReport(report, tab) {
 
   // Build table
   const table = document.createElement('table');
-  table.id = `report-table-${tab}`;
+  table.className = 'report-table';
   table.innerHTML = `
     <thead>
       <tr>
@@ -1057,17 +1007,6 @@ document.getElementById('btn-rescan-within').addEventListener('click', () => {
 });
 document.getElementById('btn-mark-executed-within').addEventListener('click', () => markFolderExecuted('within'));
 document.getElementById('btn-clear-terminal-global').addEventListener('click', clearTerminal);
-
-// Cross-quality actions
-document.getElementById('btn-cross-dry-run').addEventListener('click', () => runExecute('cross', true));
-document.getElementById('btn-cross-exec-delete').addEventListener('click', () => {
-  if (!confirm('Execute DELETE on selected files? This cannot be undone.')) return;
-  runExecute('cross', false, 'delete');
-});
-document.getElementById('btn-cross-exec-rename').addEventListener('click', () => {
-  if (!confirm('Execute RENAME on selected files?')) return;
-  runExecute('cross', false, 'rename');
-});
 document.getElementById('btn-rescan-cross').addEventListener('click', () => {
   if (state.selectedNode) {
     startScan(true, state.selectedNode);
@@ -1263,64 +1202,40 @@ document.addEventListener('keydown', (e) => {
 
 // ── Resizer handles initialization ────────────────────────────────
 function initResizers() {
-  const leftPanel = document.getElementById('panel-left');
-  const resizerLeft = document.getElementById('resizer-left');
-  
-  if (leftPanel && resizerLeft) {
-    resizerLeft.addEventListener('mousedown', (e) => {
+  // Terminal resizer for global terminal
+  const terminalResizer = document.getElementById('terminal-resizer');
+  const terminalGlobal = document.getElementById('terminal-global');
+  if (terminalResizer && terminalGlobal) {
+    terminalResizer.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      document.body.style.cursor = 'col-resize';
-      
+      terminalResizer.classList.add('active');
+      document.body.style.cursor = 'row-resize';
+
+      const startHeight = terminalGlobal.getBoundingClientRect().height;
+      const startY = e.clientY;
+
       const doDrag = (moveEvent) => {
-        let newWidth = moveEvent.clientX;
-        if (newWidth < 200) newWidth = 200;
-        if (newWidth > 500) newWidth = 500;
-        leftPanel.style.width = newWidth + 'px';
+        const deltaY = startY - moveEvent.clientY;
+        let newHeight = startHeight + deltaY;
+        const minHeight = 120;
+        const maxHeight = window.innerHeight - 200;
+        if (newHeight < minHeight) newHeight = minHeight;
+        if (newHeight > maxHeight) newHeight = maxHeight;
+        terminalGlobal.style.height = `${newHeight}px`;
+        document.documentElement.style.setProperty('--terminal-height', `${newHeight}px`);
       };
-      
+
       const stopDrag = () => {
+        terminalResizer.classList.remove('active');
         document.body.style.cursor = '';
         document.removeEventListener('mousemove', doDrag);
         document.removeEventListener('mouseup', stopDrag);
       };
-      
+
       document.addEventListener('mousemove', doDrag);
       document.addEventListener('mouseup', stopDrag);
     });
   }
-
-  // Terminals vertical resizing
-  ['within', 'cross'].forEach(tab => {
-    const termWrapper = document.getElementById(`terminal-${tab}`);
-    const resizerTerm = document.getElementById(`resizer-terminal-${tab}`);
-    
-    if (termWrapper && resizerTerm) {
-      resizerTerm.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        document.body.style.cursor = 'row-resize';
-        
-        const startHeight = termWrapper.getBoundingClientRect().height;
-        const startY = e.clientY;
-        
-        const doDrag = (moveEvent) => {
-          const deltaY = startY - moveEvent.clientY;
-          let newHeight = startHeight + deltaY;
-          if (newHeight < 100) newHeight = 100;
-          if (newHeight > 500) newHeight = 500;
-          termWrapper.style.height = newHeight + 'px';
-        };
-        
-        const stopDrag = () => {
-          document.body.style.cursor = '';
-          document.removeEventListener('mousemove', doDrag);
-          document.removeEventListener('mouseup', stopDrag);
-        };
-        
-        document.addEventListener('mousemove', doDrag);
-        document.addEventListener('mouseup', stopDrag);
-      });
-    }
-  });
 }
 
 // ── Init ──────────────────────────────────────────────────────────
