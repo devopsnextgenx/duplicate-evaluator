@@ -1,0 +1,17 @@
+version: '3.9'
+
+services:
+  duplicate-evaluator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: duplicate-evaluator
+    ports:
+      - '8765:8765'
+    environment:
+      # Override the media root inside the container.
+      DUPEVAL_TARGET_PATH: /data/media
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+      - ${TARGET_PATH:-./media/target}:/data/media:rw
+    restart: unless-stopped

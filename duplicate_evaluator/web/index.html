@@ -55,6 +55,9 @@
         <button id="btn-scan-folder" class="btn btn-primary" style="width:100%" disabled>
           <span>🔍</span> Scan Selected Folder
         </button>
+        <div id="selection-summary" class="selection-summary" style="font-size:0.82rem;color:var(--text-muted);">
+          Select one or more actress folders to scan.
+        </div>
       </div>
 
       <div class="tree-container" style="flex:1;overflow-y:auto;">
@@ -127,20 +130,6 @@
           </div>
           <div class="resizer-v" id="resizer-terminal-within"></div>
         </div>
-        <!-- Terminal -->
-        <div class="terminal-wrapper" id="terminal-within" style="display:none">
-          <div class="terminal-header">
-            <div class="terminal-dots">
-              <div class="terminal-dot red"></div>
-              <div class="terminal-dot yellow"></div>
-              <div class="terminal-dot green"></div>
-            </div>
-            <span>Terminal Output</span>
-            <button id="btn-clear-terminal" class="btn btn-ghost btn-sm btn-icon" style="margin-left:auto"
-              title="Clear">✕</button>
-          </div>
-          <pre id="terminal-output" class="terminal-output"></pre>
-        </div>
       </div>
 
       <div id="pane-cross" class="report-panel tab-pane" style="display:none">
@@ -180,20 +169,6 @@
           </div>
           <div class="resizer-v" id="resizer-terminal-cross"></div>
         </div>
-        <!-- Terminal -->
-        <div class="terminal-wrapper" id="terminal-cross" style="display:none">
-          <div class="terminal-header">
-            <div class="terminal-dots">
-              <div class="terminal-dot red"></div>
-              <div class="terminal-dot yellow"></div>
-              <div class="terminal-dot green"></div>
-            </div>
-            <span>Terminal Output</span>
-            <button id="btn-clear-terminal-cross" class="btn btn-ghost btn-sm btn-icon" style="margin-left:auto"
-              title="Clear">✕</button>
-          </div>
-          <pre id="terminal-output-cross" class="terminal-output"></pre>
-        </div>
       </div>
 
       <div id="pane-lang" class="report-panel tab-pane" style="display:none">
@@ -203,6 +178,20 @@
           <p>This feature will identify duplicate songs that span across multiple language folders. It requires careful
             cross-folder comparison logic and is currently under development.</p>
         </div>
+      </div>
+
+      <div class="terminal-wrapper terminal-global" id="terminal-global">
+        <div class="terminal-header">
+          <div class="terminal-dots">
+            <div class="terminal-dot red"></div>
+            <div class="terminal-dot yellow"></div>
+            <div class="terminal-dot green"></div>
+          </div>
+          <span>Terminal Output</span>
+          <button id="btn-clear-terminal-global" class="btn btn-ghost btn-sm btn-icon" style="margin-left:auto"
+            title="Clear">✕</button>
+        </div>
+        <pre id="terminal-output-global" class="terminal-output"></pre>
       </div>
 
     </main>

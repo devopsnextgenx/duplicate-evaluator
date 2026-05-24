@@ -35,7 +35,12 @@ class ScanRequest(BaseModel):
 async def start_scan(req: ScanRequest, background_tasks: BackgroundTasks) -> JSONResponse:
     """Start an agent scan job in the background. Returns job_id immediately."""
     job_id = str(uuid.uuid4())
-    _jobs[job_id] = {"status": "pending", "messages": [], "error": None}
+    _jobs[job_id] = {
+        "status": "pending",
+        "messages": [],
+        "error": None,
+        "folder_path": req.folder_path,
+    }
 
     background_tasks.add_task(_run_scan, job_id, req)
     logger.info("Scan job %s created: folder=%s mode=%s", job_id, req.folder_path, req.mode)
@@ -59,7 +64,12 @@ async def start_rescan(req: ScanRequest, background_tasks: BackgroundTasks) -> J
                     logger.warning("Could not delete stale file %s: %s", p, e)
 
     job_id = str(uuid.uuid4())
-    _jobs[job_id] = {"status": "pending", "messages": [], "error": None}
+    _jobs[job_id] = {
+        "status": "pending",
+        "messages": [],
+        "error": None,
+        "folder_path": req.folder_path,
+    }
 
     background_tasks.add_task(_run_scan, job_id, req)
     logger.info("Rescan job %s created: folder=%s mode=%s", job_id, req.folder_path, req.mode)

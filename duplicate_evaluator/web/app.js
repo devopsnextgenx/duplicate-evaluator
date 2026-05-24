@@ -8,6 +8,8 @@
 const state = {
   activeTab: 'within',
   selectedNode: null,       // { path, name, type, language, quality, actress }
+  selectedNodes: new Map(), // multi-select folder scan targets
+  lastSelectedPath: null,   // for shift-range selection
   currentReport: {
     within: null,
     cross: null,
@@ -128,6 +130,7 @@ async function loadTree() {
       return;
     }
     renderTree(tree.children || [], treeEl, 0);
+    updateSelectionSummary();
   } catch (e) {
     treeEl.innerHTML = `<li style="padding:1rem;color:var(--accent-red);font-size:0.78rem">⚠ ${escHtml(e.message)}</li>`;
   }
@@ -153,13 +156,17 @@ function renderTree(nodes, parentEl, depth) {
 
     let dotHtml = '';
     let rescanHtml = '';
+    let checkboxHtml = '';
     if (node.type === 'actress') {
       const status = node.scan_status || 'none';
       dotHtml = `<span class="scan-status-dot ${status}" title="Status: ${status}"></span>`;
       rescanHtml = `<button class="rescan-btn" title="Rescan folder">🔄</button>`;
+      const checked = state.selectedNodes.has(node.path) ? 'checked' : '';
+      checkboxHtml = `<input type="checkbox" class="tree-checkbox" data-path="${escHtml(node.path)}" data-name="${escHtml(node.name)}" data-language="${escHtml(node.language || '')}" data-quality="${escHtml(node.quality || '')}" data-actress="${escHtml(node.actress || '')}" ${checked} title="Select folder for bulk scan" />`;
     }
 
     label.innerHTML = `
+      ${checkboxHtml}
       ${hasChildren ? '<span class="tree-chevron">▶</span>' : '<span style="width:0.8em;display:inline-block"></span>'}
       ${dotHtml}
       <span class="icon">${icon}</span>
@@ -168,7 +175,79 @@ function renderTree(nodes, parentEl, depth) {
       ${rescanHtml}
     `;
 
+    if (node.type === 'actress' && state.selectedNodes.has(node.path)) {
+      label.classList.add('selected');
+    }
+
     li.appendChild(label);
+
+    if (node.type === 'actress') {
+      const checkbox = label.querySelector('.tree-checkbox');
+      if (checkbox) {
+        checkbox.addEventListener('click', (e) => e.stopPropagation());
+
+        // Handle click for shift-range and ctrl/meta multi-select
+        checkbox.addEventListener('click', (e) => {
+          const cb = e.target;
+          const isChecked = cb.checked;
+          const path = cb.dataset.path;
+
+          const allCBs = Array.from(document.querySelectorAll('.tree-checkbox'));
+
+          if (e.shiftKey && state.lastSelectedPath) {
+            // Determine range between lastSelectedPath and current
+            const paths = allCBs.map(x => x.dataset.path);
+            const a = paths.indexOf(state.lastSelectedPath);
+            const b = paths.indexOf(path);
+            if (a !== -1 && b !== -1) {
+              const [start, end] = a < b ? [a, b] : [b, a];
+              for (let i = start; i <= end; i++) {
+                const other = allCBs[i];
+                other.checked = isChecked;
+                const p = other.dataset.path;
+                const name = other.dataset.name || p;
+                const nodeObj = { path: p, name, language: other.dataset.language || '', quality: other.dataset.quality || null, actress: other.dataset.actress || name };
+                const lab = other.closest('.tree-label');
+                if (isChecked) {
+                  state.selectedNodes.set(p, nodeObj);
+                  if (lab) lab.classList.add('selected');
+                } else {
+                  state.selectedNodes.delete(p);
+                  if (lab) lab.classList.remove('selected');
+                }
+              }
+            }
+          } else if (e.ctrlKey || e.metaKey) {
+            // toggle single without affecting lastSelectedPath
+            if (isChecked) {
+              const name = cb.dataset.name || path;
+              const nodeObj = { path, name, language: cb.dataset.language || '', quality: cb.dataset.quality || null, actress: cb.dataset.actress || name };
+              state.selectedNodes.set(path, nodeObj);
+              label.classList.add('selected');
+            } else {
+              state.selectedNodes.delete(path);
+              label.classList.remove('selected');
+            }
+            state.lastSelectedPath = path;
+          } else {
+            // simple click: select or deselect single and update lastSelectedPath
+            if (isChecked) {
+              const name = cb.dataset.name || path;
+              const nodeObj = { path, name, language: cb.dataset.language || '', quality: cb.dataset.quality || null, actress: cb.dataset.actress || name };
+              state.selectedNodes.set(path, nodeObj);
+              label.classList.add('selected');
+            } else {
+              state.selectedNodes.delete(path);
+              label.classList.remove('selected');
+            }
+            state.lastSelectedPath = path;
+          }
+
+          updateSelectionSummary();
+          updateScanButton();
+        });
+      }
+    }
 
     if (hasChildren) {
       const childUl = document.createElement('ul');
@@ -198,7 +277,7 @@ function renderTree(nodes, parentEl, depth) {
         }
 
         if (node.type === 'actress') {
-          selectNode(node, label);
+          selectNode(node, label, e);
         }
       });
     }
@@ -207,7 +286,7 @@ function renderTree(nodes, parentEl, depth) {
       label.style.cursor = 'pointer';
       label.addEventListener('click', (e) => {
         e.stopPropagation();
-        selectNode(node, label);
+        selectNode(node, label, e);
       });
 
       // Bind rescan button click
@@ -235,11 +314,63 @@ function getIcon(node) {
   return '📁';
 }
 
-function selectNode(node, labelEl) {
-  // Deactivate previous
+function selectNode(node, labelEl, evt = null) {
+  // Modifier keys: ctrl/meta = toggle, shift = range, otherwise single-select
+  if (evt && (evt.ctrlKey || evt.metaKey)) {
+    // Toggle this node in selectedNodes
+    const path = node.path;
+    const cb = labelEl.querySelector('.tree-checkbox');
+    if (state.selectedNodes.has(path)) {
+      state.selectedNodes.delete(path);
+      if (cb) cb.checked = false;
+      labelEl.classList.remove('selected');
+    } else {
+      state.selectedNodes.set(path, node);
+      if (cb) cb.checked = true;
+      labelEl.classList.add('selected');
+    }
+    state.lastSelectedPath = path;
+    updateSelectionSummary();
+    updateScanButton();
+    return;
+  }
+
+  if (evt && evt.shiftKey && state.lastSelectedPath) {
+    // Range select between lastSelectedPath and current
+    const allCBs = Array.from(document.querySelectorAll('.tree-checkbox'));
+    const paths = allCBs.map(x => x.dataset.path);
+    const a = paths.indexOf(state.lastSelectedPath);
+    const b = paths.indexOf(node.path);
+    if (a !== -1 && b !== -1) {
+      const [start, end] = a < b ? [a, b] : [b, a];
+      for (let i = start; i <= end; i++) {
+        const other = allCBs[i];
+        other.checked = true;
+        const p = other.dataset.path;
+        const name = other.dataset.name || p;
+        const nodeObj = { path: p, name, language: other.dataset.language || '', quality: other.dataset.quality || null, actress: other.dataset.actress || name };
+        state.selectedNodes.set(p, nodeObj);
+        const lab = other.closest('.tree-label');
+        if (lab) lab.classList.add('selected');
+      }
+    }
+    state.lastSelectedPath = node.path;
+    updateSelectionSummary();
+    updateScanButton();
+    return;
+  }
+
+  // Default single-select behaviour: clear multi-selection and mark active node
   document.querySelectorAll('.tree-label.active').forEach(el => el.classList.remove('active'));
   labelEl.classList.add('active');
+
+  // Clear previous multi-selection
+  document.querySelectorAll('.tree-label.selected').forEach(el => el.classList.remove('selected'));
+  document.querySelectorAll('.tree-checkbox').forEach(cb => cb.checked = false);
+  state.selectedNodes.clear();
+
   state.selectedNode = node;
+  state.lastSelectedPath = node.path;
   updateScanButton();
 
   // If a report already exists, auto-load it for the active tab
@@ -252,12 +383,65 @@ function selectNode(node, labelEl) {
 
 function updateScanButton() {
   const btn = document.getElementById('btn-scan-folder');
-  btn.disabled = !state.selectedNode || state.activeTab === 'lang';
-  if (state.selectedNode && state.activeTab !== 'lang') {
+  const selectedCount = state.selectedNodes.size;
+  if (state.activeTab === 'lang') {
+    btn.disabled = true;
+    btn.innerHTML = `<span>🔍</span> Scan Selected Folder`;
+    return;
+  }
+
+  if (selectedCount > 0) {
+    btn.disabled = false;
+    btn.innerHTML = `<span>🔍</span> Scan Selected Folders (${selectedCount})`;
+    return;
+  }
+
+  btn.disabled = !state.selectedNode;
+  if (state.selectedNode) {
     btn.innerHTML = `<span>🔍</span> Scan: ${escHtml(state.selectedNode.name)}`;
   } else {
     btn.innerHTML = `<span>🔍</span> Scan Selected Folder`;
   }
+}
+
+function getSelectedFolders() {
+  if (state.selectedNodes.size > 0) {
+    return Array.from(state.selectedNodes.values());
+  }
+  return state.selectedNode ? [state.selectedNode] : [];
+}
+
+function updateSelectionSummary() {
+  const summary = document.getElementById('selection-summary');
+  if (!summary) return;
+  const count = state.selectedNodes.size;
+  if (count === 0) {
+    summary.textContent = 'Select one or more actress folders to scan.';
+  } else if (count === 1) {
+    summary.textContent = '1 folder selected for bulk scan.';
+  } else {
+    summary.textContent = `${count} folders selected for bulk scan.`;
+  }
+}
+
+function appendTerminal(message, type = 'info') {
+  const output = document.getElementById('terminal-output-global');
+  if (!output) return;
+  const timestamp = new Date().toLocaleTimeString();
+  let formatted = `[${timestamp}] ${message}`;
+
+  if (type === 'error') {
+    formatted = `${formatted}`;
+  }
+
+  output.textContent += `${formatted}\n`;
+  output.scrollTop = output.scrollHeight;
+}
+
+function clearTerminal() {
+  const output = document.getElementById('terminal-output-global');
+  if (!output) return;
+  output.textContent = '';
 }
 
 // ── Auto-Save & Manual Execution Helpers ─────────────────────────
@@ -405,12 +589,17 @@ function showEmptyReport(tab, msg) {
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
   const actionBar = document.getElementById(`action-bar-${tab}`);
   wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>${escHtml(msg)}</p></div>`;
-  document.getElementById(`toolbar-${tab}`).style.display = 'none';
+  const toolbarEl = document.getElementById(`toolbar-${tab}`);
+  if (toolbarEl) toolbarEl.style.display = 'none';
   if (actionBar) {
     actionBar.style.display = 'none';
     if (actionBar.parentElement) actionBar.parentElement.style.display = 'none';
   }
-  document.getElementById(`terminal-${tab}`).style.display = 'none';
+  // per-tab terminal elements were replaced by a global terminal; hide if present
+  const termEl = document.getElementById(`terminal-${tab}`);
+  if (termEl) {
+    termEl.style.display = 'none';
+  }
 }
 
 // ── Render Report Table ──────────────────────────────────────────
@@ -658,28 +847,23 @@ async function runExecute(tab, dryRun, actionFilter = null) {
     return;
   }
 
-  const termWrapper = document.getElementById(`terminal-${tab}`);
-  const termOutput  = document.getElementById(`terminal-output${tab === 'cross' ? '-cross' : ''}`);
-  termWrapper.style.display = 'flex';
-  termOutput.textContent = dryRun
-    ? `Running DRY RUN for ${actions.length} action(s)…\n`
-    : `Executing ${actions.length} action(s)…\n`;
+  appendTerminal(dryRun
+    ? `Running DRY RUN for ${actions.length} action(s)…`
+    : `Executing ${actions.length} action(s)…`
+  );
 
   try {
     const result = await api.post('/api/execute', { actions, dry_run: dryRun });
-    termOutput.textContent = result.lines.join('\n');
-    termOutput.scrollTop = termOutput.scrollHeight;
+    appendTerminal(result.lines.join('\n'));
     if (!dryRun) {
       toast(`Executed ${actions.length} action(s)`, 'success');
-      // Refresh tree to update has_report badge
       await loadTree();
-      // Auto-reload the active tab report to show the updated file list (deleted/renamed entries dynamically set to deleted)
       if (state.selectedNode) {
         await loadReport(state.selectedNode.path, tab);
       }
     }
   } catch (e) {
-    termOutput.textContent = `❌ Error: ${e.message}`;
+    appendTerminal(`❌ Error: ${e.message}`, 'error');
     toast(e.message, 'error');
   }
 }
@@ -705,19 +889,24 @@ function selectAllRadio(tab, value) {
 
 // ── Scan Folder ───────────────────────────────────────────────────
 async function startScan(isRescan = false, targetNode = null) {
-  const node = targetNode || state.selectedNode;
-  if (!node) return;
+  const selectedFolders = targetNode ? [targetNode] : getSelectedFolders();
+  if (selectedFolders.length === 0) {
+    toast('No folder selected to scan', 'info');
+    return;
+  }
 
   const tab = state.activeTab;
   const mode = tab === 'cross' ? 'cross_quality' : 'within_folder';
-
-  const termWrapper = document.getElementById(`terminal-${tab}`);
-  const termOutput  = document.getElementById(`terminal-output${tab === 'cross' ? '-cross' : ''}`);
-  termWrapper.style.display = 'flex';
-  termOutput.textContent = isRescan ? '🔄 Starting rescan…\n' : '🔍 Starting scan…\n';
+  const actionLabel = isRescan ? 'Rescan' : 'Scan';
 
   document.getElementById('btn-scan-folder').disabled = true;
-  showEmptyReport(tab, '');
+  appendTerminal(`=== ${actionLabel} started for ${selectedFolders.length} folder(s) (${tab}) ===`, 'info');
+
+  if (!targetNode && selectedFolders.length > 1) {
+    showEmptyReport(tab, `Scanning ${selectedFolders.length} selected folders…`);
+  } else {
+    showEmptyReport(tab, '');
+  }
 
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
   wrapper.innerHTML = `
@@ -726,8 +915,23 @@ async function startScan(isRescan = false, targetNode = null) {
       <p>Agent is analysing files…</p>
     </div>`;
 
+  const jobs = selectedFolders.map((node) => runFolderScan(node, isRescan, mode));
+
+  await Promise.all(jobs);
+
+  document.getElementById('btn-scan-folder').disabled = false;
+  updateScanButton();
+  await loadTree();
+  if (state.selectedNode) {
+    await loadReport(state.selectedNode.path, tab);
+  }
+}
+
+async function runFolderScan(node, isRescan, mode) {
+  const endpoint = isRescan ? '/api/rescan' : '/api/scan';
+  appendTerminal(`${isRescan ? 'Rescanning' : 'Scanning'} ${node.path}...`, 'info');
+
   try {
-    const endpoint = isRescan ? '/api/rescan' : '/api/scan';
     const job = await api.post(endpoint, {
       folder_path: node.path,
       mode,
@@ -736,43 +940,50 @@ async function startScan(isRescan = false, targetNode = null) {
       actress: node.actress || node.name || '',
     });
 
-    state.scanJobId[tab] = job.job_id;
-    pollJob(job.job_id, tab);
+    return new Promise((resolve) => {
+      let finished = false;
+      const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/progress/${job.job_id}`);
 
-    // WebSocket for live progress
-    const ws = new WebSocket(`ws://${location.host}/ws/progress/${job.job_id}`);
-    ws.onmessage = (ev) => {
-      const msg = JSON.parse(ev.data);
-      if (msg.type === 'progress') {
-        termOutput.textContent += msg.messages.join('\n') + '\n';
-        termOutput.scrollTop = termOutput.scrollHeight;
-      }
-      if (msg.type === 'done') {
+      const finish = (message) => {
+        if (finished) return;
+        finished = true;
+        appendTerminal(message);
         ws.close();
-        if (msg.status === 'done') {
-          termOutput.textContent += '✅ Scan complete!\n';
-          termOutput.scrollTop = termOutput.scrollHeight;
-          loadReport(node.path, tab);
-          toast('Scan complete!', 'success');
-        } else {
-          termOutput.textContent += `❌ Scan failed: ${msg.error}\n`;
-          termOutput.scrollTop = termOutput.scrollHeight;
-          toast(msg.error || 'Scan failed', 'error');
-          showEmptyReport(tab, `Scan failed: ${msg.error}`);
+        resolve();
+      };
+
+      ws.onmessage = (ev) => {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'progress') {
+          appendTerminal(`[${node.name}] ${msg.messages.join('\n[' + node.name + '] ')}`);
         }
-        document.getElementById('btn-scan-folder').disabled = false;
-        updateScanButton();
-        loadTree();
-      }
-    };
-    ws.onerror = () => {
-      ws.close();
-    };
+        if (msg.type === 'done') {
+          if (msg.status === 'done') {
+            finish(`✅ Scan complete for ${node.path}`);
+            if (state.selectedNode && state.selectedNode.path === node.path) {
+              loadReport(node.path, state.activeTab);
+              toast(`Scan complete: ${node.name}`, 'success');
+            }
+          } else {
+            finish(`❌ Scan failed for ${node.path}: ${msg.error || 'Unknown error'}`);
+            toast(msg.error || 'Scan failed', 'error');
+          }
+        }
+      };
+
+      ws.onerror = () => {
+        finish(`⚠ WebSocket error for ${node.path}`);
+      };
+
+      ws.onclose = () => {
+        if (!finished) {
+          finish(`⚠ WebSocket closed for ${node.path}`);
+        }
+      };
+    });
   } catch (e) {
-    toast(e.message, 'error');
-    showEmptyReport(tab, e.message);
-    document.getElementById('btn-scan-folder').disabled = false;
-    updateScanButton();
+    appendTerminal(`❌ Failed to start scan for ${node.path}: ${e.message}`, 'error');
+    return Promise.resolve();
   }
 }
 
@@ -845,10 +1056,7 @@ document.getElementById('btn-rescan-within').addEventListener('click', () => {
   }
 });
 document.getElementById('btn-mark-executed-within').addEventListener('click', () => markFolderExecuted('within'));
-document.getElementById('btn-clear-terminal').addEventListener('click', () => {
-  document.getElementById('terminal-output').textContent = '';
-  document.getElementById('terminal-within').style.display = 'none';
-});
+document.getElementById('btn-clear-terminal-global').addEventListener('click', clearTerminal);
 
 // Cross-quality actions
 document.getElementById('btn-cross-dry-run').addEventListener('click', () => runExecute('cross', true));
@@ -868,10 +1076,6 @@ document.getElementById('btn-rescan-cross').addEventListener('click', () => {
   }
 });
 document.getElementById('btn-cross-mark-executed').addEventListener('click', () => markFolderExecuted('cross'));
-document.getElementById('btn-clear-terminal-cross').addEventListener('click', () => {
-  document.getElementById('terminal-output-cross').textContent = '';
-  document.getElementById('terminal-cross').style.display = 'none';
-});
 
 // ── Custom Video Player Controls ──────────────────────────────────
 const videoOverlay = document.getElementById('video-overlay');
@@ -1120,11 +1324,14 @@ function initResizers() {
 }
 
 // ── Init ──────────────────────────────────────────────────────────
-(async function init() {
+async function init() {
   await checkHealth();
   await loadTree();
   initResizers();
 
   // Periodic health check every 30s
   setInterval(checkHealth, 30_000);
-})();
+}
+
+// Ensure init runs after DOM is ready (handles reloads reliably)
+window.addEventListener('DOMContentLoaded', init);

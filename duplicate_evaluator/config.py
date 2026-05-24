@@ -67,6 +67,20 @@ def load_config(path: Path = CONFIG_PATH) -> AppConfig:
             raw = yaml.safe_load(f) or {}
     else:
         raw = {}
+
+    # Allow Docker / environment overrides for the media root and server details
+    if env_target := os.environ.get("DUPEVAL_TARGET_PATH"):
+        raw.setdefault("media", {})["target_path"] = env_target
+
+    if env_host := os.environ.get("DUPEVAL_HOST"):
+        raw.setdefault("server", {})["host"] = env_host
+
+    if env_port := os.environ.get("DUPEVAL_PORT"):
+        try:
+            raw.setdefault("server", {})["port"] = int(env_port)
+        except ValueError:
+            raise ValueError("DUPEVAL_PORT must be an integer")
+
     return AppConfig.model_validate(raw)
 
 
