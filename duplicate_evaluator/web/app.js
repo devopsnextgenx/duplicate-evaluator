@@ -471,6 +471,23 @@ function updateScanButton() {
   }
 }
 
+// ── Terminal Management ──────────────────────────────────────────
+function appendTerminal(message, type = 'info') {
+  const output = document.getElementById('terminal-output-global');
+  if (!output) return;
+  const timestamp = new Date().toLocaleTimeString();
+  let formatted = `[${timestamp}] ${message}`;
+
+  output.textContent += `${formatted}\n`;
+  output.scrollTop = output.scrollHeight;
+}
+
+function clearTerminal() {
+  const output = document.getElementById('terminal-output-global');
+  if (!output) return;
+  output.textContent = '';
+}
+
 function getSelectedFolders() {
   if (state.selectedNodes.size > 0) {
     return Array.from(state.selectedNodes.values());
@@ -489,26 +506,6 @@ function updateSelectionSummary() {
   } else {
     summary.textContent = `${count} folders selected for bulk scan.`;
   }
-}
-
-function appendTerminal(message, type = 'info') {
-  const output = document.getElementById('terminal-output-global');
-  if (!output) return;
-  const timestamp = new Date().toLocaleTimeString();
-  let formatted = `[${timestamp}] ${message}`;
-
-  if (type === 'error') {
-    formatted = `${formatted}`;
-  }
-
-  output.textContent += `${formatted}\n`;
-  output.scrollTop = output.scrollHeight;
-}
-
-function clearTerminal() {
-  const output = document.getElementById('terminal-output-global');
-  if (!output) return;
-  output.textContent = '';
 }
 
 // ── Auto-Save & Manual Execution Helpers ─────────────────────────
@@ -662,10 +659,8 @@ function showEmptyReport(tab, msg) {
     actionBar.style.display = 'none';
     if (actionBar.parentElement) actionBar.parentElement.style.display = 'none';
   }
-  const termEl = document.getElementById(`terminal-${tab}`);
-  if (termEl) {
-    termEl.style.display = 'none';
-  }
+  
+  // FIX: Do not hard-hide the terminal layouts here as it drops the global logs panel out of view.
 }
 
 // ── Render Report Table ──────────────────────────────────────────
@@ -899,6 +894,12 @@ async function startScan(isRescan = false, targetNode = null) {
   const tab = state.activeTab;
   const mode = tab === 'cross' ? 'cross_quality' : 'within_folder';
   const actionLabel = isRescan ? 'Rescan' : 'Scan';
+
+  // FIX: Force ensure terminal layout components explicitly retain visual structural settings
+  const globalTerm = document.getElementById('terminal-global');
+  const globalResizer = document.getElementById('terminal-resizer');
+  if (globalTerm) globalTerm.style.display = 'block';
+  if (globalResizer) globalResizer.style.display = 'block';
 
   const scanBtn = document.getElementById('btn-scan-folder');
   if (scanBtn) scanBtn.disabled = true;
