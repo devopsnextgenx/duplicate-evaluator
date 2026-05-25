@@ -160,6 +160,17 @@ function escHtml(str) {
   return d.innerHTML;
 }
 
+// Render the tree interface directly using currently cached data structures
+function refreshTreeUI() {
+  const treeEl = document.getElementById('folder-tree');
+  if (!_cachedTreeData || !treeEl) return;
+
+  treeEl.innerHTML = '';
+  renderTree(_cachedTreeData.children || [], treeEl, 0);
+  updateSelectionSummary();
+  updateScanButton();
+}
+
 function humanSize(bytes) {
   if (!bytes) return '—';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -613,12 +624,17 @@ async function markFolderExecuted(tab) {
   }
 
   try {
-    const res = await api.post('/api/execute/mark-executed', {
+    await api.post('/api/execute/mark-executed', {
       folder_path: report.folder_path
     });
-    toast(res.message || 'Folder marked as executed successfully', 'success');
+    toast('Folder marked as executed successfully', 'success');
 
-    await loadTree();
+    // Update in memory cache state dynamically
+    const cachedNode = findNodeByPath(_cachedTreeData, report.folder_path);
+    if (cachedNode) {
+      cachedNode.scan_status = 'executed';
+    }
+    refreshTreeUI();
   } catch (e) {
     toast(`Failed to mark executed: ${e.message}`, 'error');
   }
@@ -842,7 +858,12 @@ async function runExecute(tab, dryRun, actionFilter = null) {
     appendTerminal(result.lines.join('\n'));
     if (!dryRun) {
       toast(`Executed ${actions.length} action(s)`, 'success');
-      await loadTree();
+      
+      // Since disk structure changes on execution, pull down clean tracking properties from root tree context
+      const tree = await api.get('/api/tree');
+      _cachedTreeData = tree;
+      restoreTreeState(tree);
+      refreshTreeUI();
     }
   } catch (e) {
     appendTerminal(`❌ Error: ${e.message}`, 'error');
@@ -902,8 +923,9 @@ async function startScan(isRescan = false, targetNode = null) {
   await Promise.all(jobs);
 
   if (scanBtn) scanBtn.disabled = false;
-  updateScanButton();
-  await loadTree();
+  
+  // Re-render UI from the updated cache instead of hitting /api/tree endpoints over the network
+  refreshTreeUI();
 }
 
 async function runFolderScan(node, isRescan, mode) {
@@ -939,12 +961,25 @@ async function runFolderScan(node, isRescan, mode) {
         if (msg.type === 'done') {
           if (msg.status === 'done') {
             finish(`✅ Scan complete for ${node.path}`);
+            
+            // MUTATE CACHE LOCALLY: Update specific node flags inside our global cache reference directly
+            const cachedNode = findNodeByPath(_cachedTreeData, node.path);
+            if (cachedNode) {
+              cachedNode.has_report = true;
+              cachedNode.scan_status = 'completed';
+            }
+
             if (state.selectedNode && state.selectedNode.path === node.path) {
               loadReport(node.path, state.activeTab);
               toast(`Scan complete: ${node.name}`, 'success');
             }
           } else {
             finish(`❌ Scan failed for ${node.path}: ${msg.error || 'Unknown error'}`);
+            
+            const cachedNode = findNodeByPath(_cachedTreeData, node.path);
+            if (cachedNode) {
+              cachedNode.scan_status = 'failed';
+            }
             toast(msg.error || 'Scan failed', 'error');
           }
         }
@@ -1001,7 +1036,7 @@ document.getElementById('btn-modal-save').addEventListener('click', () => {
 // ── Event Bindings ────────────────────────────────────────────────
 document.getElementById('btn-refresh-tree').addEventListener('click', () => {
   loadTree();
-  toast('Tree refreshed', 'info');
+  toast('Tree refreshed from server', 'info');
 });
 
 document.getElementById('btn-scan-folder').addEventListener('click', startScan);
