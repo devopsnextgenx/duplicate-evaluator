@@ -19,6 +19,8 @@ def save_report(report: FolderReport) -> Path:
     """Persist a FolderReport to <folder_path>/_report.json."""
     target = Path(report.folder_path) / REPORT_FILENAME
     try:
+        # Ensure parent directory exists
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(
             report.model_dump_json(indent=2),
             encoding="utf-8",

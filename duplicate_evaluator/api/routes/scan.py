@@ -34,6 +34,15 @@ class ScanRequest(BaseModel):
 @router.post("/scan")
 async def start_scan(req: ScanRequest, background_tasks: BackgroundTasks) -> JSONResponse:
     """Start an agent scan job in the background. Returns job_id immediately."""
+    from pathlib import Path
+    
+    # Validate that the folder path is a directory
+    folder = Path(req.folder_path)
+    if not folder.exists():
+        raise HTTPException(status_code=400, detail=f"Path does not exist: {req.folder_path}")
+    if not folder.is_dir():
+        raise HTTPException(status_code=400, detail=f"Path is not a directory: {req.folder_path}")
+    
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {
         "status": "pending",
@@ -53,15 +62,21 @@ from pathlib import Path
 async def start_rescan(req: ScanRequest, background_tasks: BackgroundTasks) -> JSONResponse:
     """Delete stale reports and run a fresh scan."""
     folder = Path(req.folder_path)
-    if folder.is_dir():
-        for item in ("_report.json", "_executed.json"):
-            p = folder / item
-            if p.exists():
-                try:
-                    p.unlink()
-                    logger.info("Deleted stale file: %s", p)
-                except Exception as e:
-                    logger.warning("Could not delete stale file %s: %s", p, e)
+    
+    # Validate that the folder path is a directory
+    if not folder.exists():
+        raise HTTPException(status_code=400, detail=f"Path does not exist: {req.folder_path}")
+    if not folder.is_dir():
+        raise HTTPException(status_code=400, detail=f"Path is not a directory: {req.folder_path}")
+    
+    for item in ("_report.json", "_executed.json"):
+        p = folder / item
+        if p.exists():
+            try:
+                p.unlink()
+                logger.info("Deleted stale file: %s", p)
+            except Exception as e:
+                logger.warning("Could not delete stale file %s: %s", p, e)
 
     job_id = str(uuid.uuid4())
     _jobs[job_id] = {

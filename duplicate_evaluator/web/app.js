@@ -26,6 +26,8 @@ const state = {
   scanProgress: { total: 0, completed: 0 },
 };
 
+let terminalAutoScroll = true;
+
 // ── localStorage Tree State Persistence ──────────────────────────
 const TREE_STATE_KEY = 'treeState';
 
@@ -517,11 +519,15 @@ function updateScanButton() {
 function appendTerminal(message, type = 'info') {
   const output = document.getElementById('terminal-output-global');
   if (!output) return;
+  const isAtBottom = output.scrollHeight - output.scrollTop <= output.clientHeight + 4;
   const timestamp = new Date().toLocaleTimeString();
   let formatted = `[${timestamp}] ${message}`;
 
   output.textContent += `${formatted}\n`;
-  output.scrollTop = output.scrollHeight;
+
+  if (terminalAutoScroll && isAtBottom) {
+    output.scrollTop = output.scrollHeight;
+  }
 }
 
 // Explicitly clean up text streams without altering DOM attributes
@@ -1218,6 +1224,14 @@ document.getElementById('btn-rescan-within').addEventListener('click', () => {
 });
 document.getElementById('btn-mark-executed-within').addEventListener('click', () => markFolderExecuted('within'));
 document.getElementById('btn-clear-terminal-global').addEventListener('click', clearTerminal);
+
+const terminalOutput = document.getElementById('terminal-output-global');
+if (terminalOutput) {
+  terminalOutput.addEventListener('scroll', () => {
+    terminalAutoScroll = terminalOutput.scrollHeight - terminalOutput.scrollTop <= terminalOutput.clientHeight + 4;
+  });
+}
+
 document.getElementById('btn-rescan-cross').addEventListener('click', () => {
   if (state.selectedNode) {
     startScan(true, state.selectedNode);
@@ -1413,7 +1427,7 @@ function initResizers() {
     // Explicitly guarantee position rule boundaries upfront
     terminalGlobal.style.display = 'block';
     terminalGlobal.style.position = 'fixed';
-    terminalGlobal.style.bottom = '0px';
+    terminalGlobal.style.bottom = '30px';
     terminalGlobal.style.left = 'var(--sidebar-width, 260px)';
     terminalGlobal.style.right = '0px';
     terminalGlobal.style.zIndex = '999';
@@ -1426,7 +1440,7 @@ function initResizers() {
 
     const initialHeight = localStorage.getItem('terminal-preferred-height') || '220';
     terminalGlobal.style.height = `${initialHeight}px`;
-    terminalResizer.style.bottom = `${initialHeight}px`;
+    terminalResizer.style.bottom = `${initialHeight + 30}px`;
     document.documentElement.style.setProperty('--terminal-height', `${initialHeight}px`);
 
     terminalResizer.addEventListener('mousedown', (e) => {
@@ -1449,7 +1463,7 @@ function initResizers() {
         if (newHeight > maxHeight) newHeight = maxHeight;
 
         terminalGlobal.style.height = `${newHeight}px`;
-        terminalResizer.style.bottom = `${newHeight}px`;
+        terminalResizer.style.bottom = `${newHeight + 30}px`;
         document.documentElement.style.setProperty('--terminal-height', `${newHeight}px`);
         localStorage.setItem('terminal-preferred-height', newHeight);
         syncPaneParentMargin();
@@ -1480,12 +1494,12 @@ function syncPaneParentMargin() {
     
     terminalGlobal.style.display = 'block';
     terminalGlobal.style.position = 'fixed';
-    terminalGlobal.style.bottom = '0px';
+    terminalGlobal.style.bottom = '30px';
     
     if (terminalResizer) {
       terminalResizer.style.display = 'block';
       terminalResizer.style.position = 'fixed';
-      terminalResizer.style.bottom = `${currentHeight}px`;
+      terminalResizer.style.bottom = `${currentHeight+30}px`;
     }
     
     if (paneParent) {

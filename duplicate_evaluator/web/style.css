@@ -200,7 +200,7 @@ h3 {
   display: flex;
   flex: 1;
   overflow: hidden;
-  height: calc(100vh - 52px);
+  height: calc(100vh - 82px);
   max-height: calc(100vh - 52px);
 }
 
@@ -363,7 +363,7 @@ h3 {
 .pane-parent {
   flex: 1;
   min-height: 0;
-  max-height: calc(100% - 6px);
+  max-height: calc(100% - 36px);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -770,6 +770,7 @@ h3 {
 .terminal-output {
   flex: 1;
   min-height: 0;
+  max-height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0.75rem 1rem;
