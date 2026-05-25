@@ -651,21 +651,22 @@ function renderReport(report, tab) {
 
     const tr = document.createElement('tr');
     tr.className = rowClass;
+    tr.title = `${escHtml(entry.similar_files?.map(f => f.filename).join('\n') || 'No similar files')}`;
     tr.dataset.path = file.path;
     tr.dataset.filename = file.filename;
     tr.innerHTML = `
       <td style="color:var(--text-muted);font-size:0.7rem">${idx + 1}</td>
-      <td class="td-filename" title="${escHtml(file.filename)}">${filenameHtml}</td>
+      <td class="td-filename">${filenameHtml}</td>
       <td>${playBtnHtml}</td>
       <td class="td-size">${humanSize(file.size_bytes)}</td>
       <td>
-        <span class="conf-badge ${confClass(entry.confidence)}" title="${escHtml(entry.reason)}">
+        <span class="conf-badge ${confClass(entry.confidence)}" title="${escHtml(entry.similar_files?.map(f => f.filename).join('\n') || 'No similar files')}" style="font-weight:600">
           ${confLabel(entry.confidence)}
         </span>
       </td>
       <td>
         ${isDup
-          ? `<span class="bool-badge yes-dup">✓ Yes</span>`
+          ? `<span class="bool-badge yes-dup" title="${escHtml(entry.similar_files?.map(f => f.filename).join('\n') || 'No similar files')}">✓ Yes</span>`
           : `<span class="bool-badge no">— No</span>`}
       </td>
       <td>
