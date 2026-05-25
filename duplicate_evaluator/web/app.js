@@ -25,6 +25,99 @@ const state = {
   expandedPaths: new Set(), // Track expanded tree node paths
 };
 
+// ── localStorage Tree State Persistence ──────────────────────────
+const TREE_STATE_KEY = 'treeState';
+
+function saveTreeState() {
+  const treeState = {
+    expandedPaths: Array.from(state.expandedPaths),
+    selectedNodePath: state.selectedNode ? state.selectedNode.path : null,
+    selectedNodePaths: Array.from(state.selectedNodes.keys()),
+    lastSelectedPath: state.lastSelectedPath,
+    activeTab: state.activeTab,
+  };
+  localStorage.setItem(TREE_STATE_KEY, JSON.stringify(treeState));
+}
+
+function loadTreeState() {
+  try {
+    const raw = localStorage.getItem(TREE_STATE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function restoreTreeState(treeData) {
+  const saved = loadTreeState();
+  if (!saved) return;
+
+  // 1. Restore expanded paths in state
+  if (saved.expandedPaths && Array.isArray(saved.expandedPaths)) {
+    saved.expandedPaths.forEach(p => state.expandedPaths.add(p));
+  }
+
+  // 2. Restore active tab
+  if (saved.activeTab) {
+    state.activeTab = saved.activeTab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
+    const targetTab = document.querySelector(`.tab[data-tab="${saved.activeTab}"]`);
+    if (targetTab) {
+      targetTab.classList.add('active');
+      document.getElementById(`pane-${saved.activeTab}`).style.display = 'flex';
+    }
+  }
+
+  // 3. Restore selected node in state
+  if (saved.selectedNodePath) {
+    const node = findNodeByPath(treeData, saved.selectedNodePath);
+    if (node) {
+      state.selectedNode = node;
+      state.lastSelectedPath = saved.lastSelectedPath || node.path;
+
+      // Force parent structures to be added to open list
+      ensurePathExpanded(node.path);
+    }
+  }
+
+  // 4. Restore multi-selection map records
+  if (saved.selectedNodePaths && Array.isArray(saved.selectedNodePaths)) {
+    saved.selectedNodePaths.forEach(path => {
+      const node = findNodeByPath(treeData, path);
+      if (node) {
+        state.selectedNodes.set(path, node);
+        ensurePathExpanded(path);
+      }
+    });
+  }
+}
+
+function findNodeByPath(nodes, targetPath) {
+  if (!nodes) return null;
+  // If passed the root element object instead of child array
+  const nodesArray = Array.isArray(nodes) ? nodes : (nodes.children || [nodes]);
+  
+  for (const node of nodesArray) {
+    if (node.path === targetPath) return node;
+    if (node.children && node.children.length > 0) {
+      const found = findNodeByPath(node.children, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function ensurePathExpanded(nodePath) {
+  const parts = nodePath.split('/');
+  let currentPath = '';
+  for (let i = 0; i < parts.length - 1; i++) {
+    currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
+    state.expandedPaths.add(currentPath);
+  }
+}
+
 // ── API Helpers ─────────────────────────────────────────────────
 const api = {
   async get(path) {
@@ -92,15 +185,13 @@ function confLabel(score) {
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     const target = tab.dataset.tab;
-    if (tab.classList.contains('wip')) {
-      // still switch to show the WIP banner
-    }
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.style.display = 'none');
     tab.classList.add('active');
     document.getElementById(`pane-${target}`).style.display = 'flex';
     state.activeTab = target;
     updateScanButton();
+    saveTreeState();
   });
 });
 
@@ -119,18 +210,35 @@ async function checkHealth() {
 }
 
 // ── Folder Tree ──────────────────────────────────────────────────
+let _cachedTreeData = null;
+
 async function loadTree() {
   const treeEl = document.getElementById('folder-tree');
   treeEl.innerHTML = '<li style="padding:1rem;color:var(--text-muted);font-size:0.78rem"><span class="spinner"></span> Loading…</li>';
   try {
     const tree = await api.get('/api/tree');
+    _cachedTreeData = tree;
     treeEl.innerHTML = '';
     if (tree.error) {
       treeEl.innerHTML = `<li style="padding:1rem;color:var(--accent-red);font-size:0.78rem">⚠ ${escHtml(tree.error)}</li>`;
       return;
     }
+
+    // CRITICAL FIX: Pre-populate state references BEFORE drawing elements to the screen
+    restoreTreeState(tree);
+
     renderTree(tree.children || [], treeEl, 0);
     updateSelectionSummary();
+    updateScanButton();
+
+    // Automatically trigger data load for the restored folder choice
+    if (state.selectedNode) {
+      if (state.selectedNode.has_report) {
+        loadReport(state.selectedNode.path, state.activeTab);
+      } else {
+        showEmptyReport(state.activeTab, `No report found. Click "Scan Selected Folder" to analyse.`);
+      }
+    }
   } catch (e) {
     treeEl.innerHTML = `<li style="padding:1rem;color:var(--accent-red);font-size:0.78rem">⚠ ${escHtml(e.message)}</li>`;
   }
@@ -145,10 +253,16 @@ function renderTree(nodes, parentEl, depth) {
     label.className = 'tree-label';
     label.style.paddingLeft = `${0.75 + depth * 1}rem`;
 
-    // Restore active highlight and fresh node reference on re-render
+    // FIX: Apply active visual styling if this node matches the restored single selection
     if (state.selectedNode && node.path === state.selectedNode.path) {
       label.classList.add('active');
-      state.selectedNode = node; // Keep reference fresh
+      state.selectedNode = node; // Update structure references
+    }
+
+    // FIX: Apply bulk selection indicators if part of multi-select list
+    if (state.selectedNodes.has(node.path)) {
+      label.classList.add('selected');
+      state.selectedNodes.set(node.path, node); // Update structure references
     }
 
     const icon = getIcon(node);
@@ -171,28 +285,20 @@ function renderTree(nodes, parentEl, depth) {
       ${rescanHtml}
     `;
 
-    if (node.type === 'actress' && state.selectedNodes.has(node.path)) {
-      label.classList.add('selected');
-    }
-
     li.appendChild(label);
 
     if (node.type === 'actress') {
-      // Handle selection by clicking on row
       label.style.cursor = 'pointer';
       label.addEventListener('click', (e) => {
         e.stopPropagation();
-        
-        // Check if the click was on the rescan button
+
         if (e.target.classList && e.target.classList.contains('rescan-btn')) {
           selectNode(node, label);
           startScan(true, node);
           return;
         }
-        
-        // Handle modifier keys for multi-select
+
         if (e.ctrlKey || e.metaKey) {
-          // Toggle this node in selectedNodes
           const path = node.path;
           if (state.selectedNodes.has(path)) {
             state.selectedNodes.delete(path);
@@ -204,26 +310,25 @@ function renderTree(nodes, parentEl, depth) {
           state.lastSelectedPath = path;
           updateSelectionSummary();
           updateScanButton();
+          saveTreeState();
           return;
         }
-        
+
         if (e.shiftKey && state.lastSelectedPath) {
-          // Range select between lastSelectedPath and current
           const allLabels = Array.from(document.querySelectorAll('.tree-label'));
           const actressLabels = allLabels.filter(lbl => {
             const li = lbl.closest('li');
             return li && li.classList.contains('tree-level-actress');
           });
-          
+
           const paths = actressLabels.map(lbl => lbl.querySelector('.name')?.getAttribute('title') || '');
           const a = paths.indexOf(state.lastSelectedPath);
           const b = paths.indexOf(node.path);
-          
+
           if (a !== -1 && b !== -1) {
             const [start, end] = a < b ? [a, b] : [b, a];
             for (let i = start; i <= end; i++) {
               const otherLabel = actressLabels[i];
-              const otherLi = otherLabel.closest('li');
               const otherNode = getNodeFromLabel(otherLabel);
               if (otherNode) {
                 state.selectedNodes.set(otherNode.path, otherNode);
@@ -234,30 +339,28 @@ function renderTree(nodes, parentEl, depth) {
           state.lastSelectedPath = node.path;
           updateSelectionSummary();
           updateScanButton();
+          saveTreeState();
           return;
         }
-        
-        // Default single-select behaviour
+
         document.querySelectorAll('.tree-label.active').forEach(el => el.classList.remove('active'));
         label.classList.add('active');
-        
-        // Clear previous multi-selection
+
         document.querySelectorAll('.tree-label.selected').forEach(el => el.classList.remove('selected'));
         state.selectedNodes.clear();
-        
+
         state.selectedNode = node;
         state.lastSelectedPath = node.path;
         updateScanButton();
-        
-        // If a report already exists, auto-load it for the active tab
+        saveTreeState();
+
         if (node.has_report) {
           loadReport(node.path, state.activeTab);
         } else {
           showEmptyReport(state.activeTab, `No report found. Click "Scan Selected Folder" to analyse.`);
         }
       });
-      
-      // Bind rescan button click
+
       const rescanBtn = label.querySelector('.rescan-btn');
       if (rescanBtn) {
         rescanBtn.addEventListener('click', (e) => {
@@ -272,7 +375,7 @@ function renderTree(nodes, parentEl, depth) {
       const childUl = document.createElement('ul');
       childUl.className = 'tree-children';
 
-      // Restore expanded state on re-render
+      // FIX: Check memory context and force UI layouts to drop open immediately
       const shouldBeOpen = state.expandedPaths.has(node.path);
       if (shouldBeOpen) {
         childUl.classList.add('open');
@@ -294,6 +397,7 @@ function renderTree(nodes, parentEl, depth) {
         } else {
           state.expandedPaths.delete(node.path);
         }
+        saveTreeState();
       });
     }
 
@@ -322,17 +426,19 @@ function getIcon(node) {
 function selectNode(node, labelEl) {
   document.querySelectorAll('.tree-label.active').forEach(el => el.classList.remove('active'));
   labelEl.classList.add('active');
-  
+
   document.querySelectorAll('.tree-label.selected').forEach(el => el.classList.remove('selected'));
   state.selectedNodes.clear();
-  
+
   state.selectedNode = node;
   state.lastSelectedPath = node.path;
   updateScanButton();
+  saveTreeState();
 }
 
 function updateScanButton() {
   const btn = document.getElementById('btn-scan-folder');
+  if (!btn) return;
   const selectedCount = state.selectedNodes.size;
   if (state.activeTab === 'lang') {
     btn.disabled = true;
@@ -399,7 +505,7 @@ function updateAutoSaveStatus(tab, stateText, customText = '') {
   const el = document.getElementById(`auto-save-status-${tab}`);
   if (!el) return;
 
-  el.className = 'auto-save-status'; // Reset
+  el.className = 'auto-save-status';
 
   if (stateText === 'draft') {
     el.classList.add('show', 'draft');
@@ -410,7 +516,6 @@ function updateAutoSaveStatus(tab, stateText, customText = '') {
   } else if (stateText === 'saved') {
     el.classList.add('show', 'saved');
     el.innerHTML = `<span>✓</span> All changes saved`;
-    // Hide after 3 seconds
     setTimeout(() => {
       if (el.classList.contains('saved')) {
         el.classList.remove('show');
@@ -512,12 +617,8 @@ async function markFolderExecuted(tab) {
       folder_path: report.folder_path
     });
     toast(res.message || 'Folder marked as executed successfully', 'success');
-    
-    // Refresh tree and current report
+
     await loadTree();
-    if (state.selectedNode) {
-      await loadReport(state.selectedNode.path, tab);
-    }
   } catch (e) {
     toast(`Failed to mark executed: ${e.message}`, 'error');
   }
@@ -538,14 +639,13 @@ async function loadReport(folderPath, tab) {
 function showEmptyReport(tab, msg) {
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
   const actionBar = document.getElementById(`action-bar`);
-  wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>${escHtml(msg)}</p></div>`;
+  if (wrapper) wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>${escHtml(msg)}</p></div>`;
   const toolbarEl = document.getElementById(`toolbar-${tab}`);
   if (toolbarEl) toolbarEl.style.display = 'none';
   if (actionBar) {
     actionBar.style.display = 'none';
     if (actionBar.parentElement) actionBar.parentElement.style.display = 'none';
   }
-  // per-tab terminal elements were replaced by a global terminal; hide if present
   const termEl = document.getElementById(`terminal-${tab}`);
   if (termEl) {
     termEl.style.display = 'none';
@@ -561,28 +661,30 @@ function renderReport(report, tab) {
   const titleEl = document.getElementById(`report-title-${tab}`);
   const metaEl  = document.getElementById(`report-meta-${tab}`);
 
+  if (!wrapper || !toolbar) return;
+
   if (!report) {
     showEmptyReport(tab, 'No report found.');
     return;
   }
 
-  // Clear any active auto-save timers or indicators when rendering a new/fresh report
   if (state.saveTimers[tab]) {
     clearTimeout(state.saveTimers[tab]);
     state.saveTimers[tab] = null;
   }
   updateAutoSaveStatus(tab, 'none');
 
-  // Toolbar is always shown if report is present
   toolbar.style.display = 'flex';
   if (actionBarWrapper) actionBarWrapper.style.display = 'flex';
-  titleEl.textContent = `${report.actress || report.folder_path} · ${report.mode}`;
-  metaEl.innerHTML = `
-    <span class="stat-chip total">📁 ${report.total_files_scanned} scanned</span>
-    <span class="stat-chip dup">🔴 ${report.duplicate_count || 0} duplicates</span>
-    <span class="stat-chip rename">✏ ${report.rename_count || 0} to rename</span>
-    <span class="stat-chip total" title="LLM model used">🤖 ${escHtml(report.llm_model || '—')}</span>
-  `;
+  if (titleEl) titleEl.textContent = `${report.actress || report.folder_path} · ${report.mode}`;
+  if (metaEl) {
+    metaEl.innerHTML = `
+      <span class="stat-chip total">📁 ${report.total_files_scanned} scanned</span>
+      <span class="stat-chip dup">🔴 ${report.duplicate_count || 0} duplicates</span>
+      <span class="stat-chip rename">✏ ${report.rename_count || 0} to rename</span>
+      <span class="stat-chip total" title="LLM model used">🤖 ${escHtml(report.llm_model || '—')}</span>
+    `;
+  }
 
   if (!report.entries || report.entries.length === 0) {
     wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>No flagged files found in this folder. All files appear clean.</p></div>`;
@@ -590,7 +692,6 @@ function renderReport(report, tab) {
     return;
   }
 
-  // Build table
   const table = document.createElement('table');
   table.className = 'report-table';
   table.innerHTML = `
@@ -627,13 +728,11 @@ function renderReport(report, tab) {
 
     let rowClass = rowClasses.join(' ');
 
-    // Determine default action
     let defAction = entry.suggested_action || 'keep';
-    if (isDeleted) defAction = 'keep'; // No action on already deleted files
+    if (isDeleted) defAction = 'keep';
 
     const uid = `${tab}-${idx}`;
 
-    // Play button cell: enabled for non-deleted files (including needsRename before execution)
     let playBtnHtml = '';
     if (isDeleted) {
       playBtnHtml = `<button class="play-btn" disabled title="File is deleted">▶ Play</button>`;
@@ -641,7 +740,6 @@ function renderReport(report, tab) {
       playBtnHtml = `<button class="play-btn btn-play-video" data-path="${escHtml(file.path)}" data-filename="${escHtml(file.filename)}" title="Stream Video">▶ Play</button>`;
     }
 
-    // Filename cell: strike-through if deleted
     let filenameHtml = '';
     if (isDeleted) {
       filenameHtml = `<span class="file-deleted"><del>${escHtml(file.filename)}</del></span> <span class="badge" style="color:var(--accent-red);font-size:0.65rem;border:1px solid var(--accent-red);padding:0.05rem 0.2rem;border-radius:3px;margin-left:0.3rem;font-weight:600">DELETED</span>`;
@@ -690,7 +788,6 @@ function renderReport(report, tab) {
     tbody.appendChild(tr);
   });
 
-  // Bind play buttons to open modal
   tbody.querySelectorAll('.btn-play-video').forEach(btn => {
     btn.addEventListener('click', () => {
       const path = btn.dataset.path;
@@ -699,31 +796,15 @@ function renderReport(report, tab) {
     });
   });
 
-  // Attach hover handlers to table rows
-  tbody.querySelectorAll('tr').forEach((tr, index) => {
-    const entry = report.entries && report.entries[index];
-    if (!entry) return;
-    tr._similarFiles = entry.similar_files || [];
-    tr.addEventListener('mouseenter', (e) => {
-      if (!tr.classList.contains('is-duplicate')) return;
-      const files = tr._similarFiles || [];
-      if (!files || files.length === 0) return;
-    });
-    tr.addEventListener('mouseleave', () => {
-    });
-  });
-
-  // Bind change event to auto-save when user interacts with action radios
   tbody.addEventListener('change', (e) => {
     if (e.target.classList.contains('action-radio')) {
       queueAutoSave(tab);
     }
   });
 
-  actionBar.style.display = 'flex';
+  if (actionBar) actionBar.style.display = 'flex';
 }
 
-// ── Collect Actions from Table ───────────────────────────────────
 function collectActions(tab) {
   const tbody = document.getElementById(`report-tbody-${tab}`);
   if (!tbody) return [];
@@ -740,7 +821,6 @@ function collectActions(tab) {
   return actions;
 }
 
-// ── Execute / Dry Run ─────────────────────────────────────────────
 async function runExecute(tab, dryRun, actionFilter = null) {
   const allActions = collectActions(tab);
   const actions = actionFilter
@@ -763,9 +843,6 @@ async function runExecute(tab, dryRun, actionFilter = null) {
     if (!dryRun) {
       toast(`Executed ${actions.length} action(s)`, 'success');
       await loadTree();
-      if (state.selectedNode) {
-        await loadReport(state.selectedNode.path, tab);
-      }
     }
   } catch (e) {
     appendTerminal(`❌ Error: ${e.message}`, 'error');
@@ -773,12 +850,11 @@ async function runExecute(tab, dryRun, actionFilter = null) {
   }
 }
 
-// ── Select All helpers ────────────────────────────────────────────
 function selectAllRadio(tab, value) {
   const tbody = document.getElementById(`report-tbody-${tab}`);
   if (!tbody) return;
   let changed = false;
-  tbody.querySelectorAll('tr').forEach((tr, idx) => {
+  tbody.querySelectorAll('tr').forEach((tr) => {
     const radio = tr.querySelector(`input[value="${value}"]`);
     if (radio && !radio.disabled) {
       if (!radio.checked) {
@@ -792,7 +868,6 @@ function selectAllRadio(tab, value) {
   }
 }
 
-// ── Scan Folder ───────────────────────────────────────────────────
 async function startScan(isRescan = false, targetNode = null) {
   const selectedFolders = targetNode ? [targetNode] : getSelectedFolders();
   if (selectedFolders.length === 0) {
@@ -804,7 +879,8 @@ async function startScan(isRescan = false, targetNode = null) {
   const mode = tab === 'cross' ? 'cross_quality' : 'within_folder';
   const actionLabel = isRescan ? 'Rescan' : 'Scan';
 
-  document.getElementById('btn-scan-folder').disabled = true;
+  const scanBtn = document.getElementById('btn-scan-folder');
+  if (scanBtn) scanBtn.disabled = true;
   appendTerminal(`=== ${actionLabel} started for ${selectedFolders.length} folder(s) (${tab}) ===`, 'info');
 
   if (!targetNode && selectedFolders.length > 1) {
@@ -814,22 +890,20 @@ async function startScan(isRescan = false, targetNode = null) {
   }
 
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
-  wrapper.innerHTML = `
-    <div class="empty-state">
-      <span class="spinner" style="width:24px;height:24px"></span>
-      <p>Agent is analysing files…</p>
-    </div>`;
+  if (wrapper) {
+    wrapper.innerHTML = `
+      <div class="empty-state">
+        <span class="spinner" style="width:24px;height:24px"></span>
+        <p>Agent is analysing files…</p>
+      </div>`;
+  }
 
   const jobs = selectedFolders.map((node) => runFolderScan(node, isRescan, mode));
-
   await Promise.all(jobs);
 
-  document.getElementById('btn-scan-folder').disabled = false;
+  if (scanBtn) scanBtn.disabled = false;
   updateScanButton();
   await loadTree();
-  if (state.selectedNode) {
-    await loadReport(state.selectedNode.path, tab);
-  }
 }
 
 async function runFolderScan(node, isRescan, mode) {
@@ -876,15 +950,8 @@ async function runFolderScan(node, isRescan, mode) {
         }
       };
 
-      ws.onerror = () => {
-        finish(`⚠ WebSocket error for ${node.path}`);
-      };
-
-      ws.onclose = () => {
-        if (!finished) {
-          finish(`⚠ WebSocket closed for ${node.path}`);
-        }
-      };
+      ws.onerror = () => { finish(`⚠ WebSocket error for ${node.path}`); };
+      ws.onclose = () => { if (!finished) { finish(`⚠ WebSocket closed for ${node.path}`); } };
     });
   } catch (e) {
     appendTerminal(`❌ Failed to start scan for ${node.path}: ${e.message}`, 'error');
@@ -893,7 +960,6 @@ async function runFolderScan(node, isRescan, mode) {
 }
 
 async function pollJob(jobId, tab) {
-  // Backup polling in case WebSocket is not connected
   const INTERVAL = 1500;
   const poll = async () => {
     try {
@@ -933,17 +999,12 @@ document.getElementById('btn-modal-save').addEventListener('click', () => {
 });
 
 // ── Event Bindings ────────────────────────────────────────────────
-
-// Refresh tree
 document.getElementById('btn-refresh-tree').addEventListener('click', () => {
   loadTree();
   toast('Tree refreshed', 'info');
 });
 
-// Scan button
 document.getElementById('btn-scan-folder').addEventListener('click', startScan);
-
-// Within-folder actions
 document.getElementById('btn-dry-run').addEventListener('click', () => runExecute('within', true));
 document.getElementById('btn-exec-delete').addEventListener('click', () => {
   if (!confirm('Execute DELETE on selected files? This cannot be undone.')) return;
@@ -989,7 +1050,7 @@ function updateVideoStats() {
   if (!videoEl) return;
   const origResEl = document.getElementById('video-orig-res');
   const dispResEl = document.getElementById('video-disp-res');
-  
+
   if (origResEl) {
     if (videoEl.videoWidth && videoEl.videoHeight) {
       origResEl.textContent = `${videoEl.videoWidth}x${videoEl.videoHeight}`;
@@ -997,7 +1058,7 @@ function updateVideoStats() {
       origResEl.textContent = 'Loading...';
     }
   }
-  
+
   if (dispResEl) {
     const rect = videoEl.getBoundingClientRect();
     const w = Math.round(rect.width);
@@ -1013,33 +1074,29 @@ function updateVideoStats() {
 function openVideo(path, filename) {
   if (!videoOverlay || !videoEl) return;
   videoPlayerTitle.textContent = filename || 'Video Player';
-  
-  // Reset stats to placeholder while loading
+
   const origResEl = document.getElementById('video-orig-res');
   const dispResEl = document.getElementById('video-disp-res');
   if (origResEl) origResEl.textContent = 'Loading...';
   if (dispResEl) dispResEl.textContent = '—';
-  
+
   videoEl.src = `/api/video?path=${encodeURIComponent(path)}`;
   videoOverlay.style.display = 'flex';
   videoEl.play().catch(() => {});
   videoPlayBtn.textContent = '⏸';
-  
-  // Trigger update after a short delay to capture layout size
+
   setTimeout(updateVideoStats, 300);
 }
 
 function closeVideo() {
   if (!videoOverlay || !videoEl) return;
   videoEl.pause();
-  videoEl.removeAttribute('src'); // Stop downloading/streaming
+  videoEl.removeAttribute('src');
   videoEl.load();
   videoOverlay.style.display = 'none';
 }
 
-if (videoCloseBtn) {
-  videoCloseBtn.addEventListener('click', closeVideo);
-}
+if (videoCloseBtn) videoCloseBtn.addEventListener('click', closeVideo);
 if (videoOverlay) {
   videoOverlay.addEventListener('click', (e) => {
     if (e.target === videoOverlay) closeVideo();
@@ -1063,10 +1120,10 @@ if (videoEl) {
     const cur = videoEl.currentTime;
     const dur = videoEl.duration || 0;
     const pct = dur > 0 ? (cur / dur) * 100 : 0;
-    
+
     if (videoProgressBar) videoProgressBar.style.width = pct + '%';
     if (videoProgressHandle) videoProgressHandle.style.left = pct + '%';
-    
+
     const fmt = (secs) => {
       const m = Math.floor(secs / 60).toString().padStart(2, '0');
       const s = Math.floor(secs % 60).toString().padStart(2, '0');
@@ -1076,12 +1133,10 @@ if (videoEl) {
       videoTimeDisplay.textContent = `${fmt(cur)} / ${fmt(dur)}`;
     }
   });
-  
-  // Resolution playback stats listeners
+
   videoEl.addEventListener('loadedmetadata', updateVideoStats);
   videoEl.addEventListener('playing', updateVideoStats);
-  
-  // Update displayed size on window resize
+
   window.addEventListener('resize', () => {
     if (videoOverlay && videoOverlay.style.display === 'flex') {
       updateVideoStats();
@@ -1143,7 +1198,6 @@ if (videoFullscreenBtn && videoEl) {
   });
 }
 
-// Esc to close, Space to toggle play
 document.addEventListener('keydown', (e) => {
   if (videoOverlay && videoOverlay.style.display === 'flex') {
     if (e.key === 'Escape') {
@@ -1157,7 +1211,6 @@ document.addEventListener('keydown', (e) => {
 
 // ── Resizer handles initialization ────────────────────────────────
 function initResizers() {
-  // Terminal resizer for global terminal
   const terminalResizer = document.getElementById('terminal-resizer');
   const terminalGlobal = document.getElementById('terminal-global');
   const paneParent = document.querySelector('.pane-parent');
@@ -1177,22 +1230,14 @@ function initResizers() {
         const deltaY = startY - moveEvent.clientY;
         let newHeight = startHeight + deltaY;
         const minHeight = 120;
-        const maxHeight = panelHeight - 200; // Leave at least 200px for pane-parent
+        const maxHeight = panelHeight - 200;
 
         if (newHeight < minHeight) newHeight = minHeight;
         if (newHeight > maxHeight) newHeight = maxHeight;
 
-        // Update terminal height
         terminalGlobal.style.height = `${newHeight}px`;
-
-        // Update CSS variable (used by resizer bottom position)
         document.documentElement.style.setProperty('--terminal-height', `${newHeight}px`);
-
-        // CRITICAL: Update pane-parent margin-bottom to match new terminal height
-        // This prevents table rows from being hidden behind the terminal
         paneParent.style.marginBottom = `0px`;
-
-        // Update resizer position directly (since it uses bottom: var(--terminal-height))
         terminalResizer.style.bottom = `${newHeight}px`;
       };
 
@@ -1210,27 +1255,22 @@ function initResizers() {
   }
 }
 
-// ── Init ──────────────────────────────────────────────────────────
-async function init() {
-  await checkHealth();
-  await loadTree();
-  initResizers();
-
-  // Sync pane-parent margin-bottom with initial terminal height
-  syncPaneParentMargin();
-
-  // Periodic health check every 30s
-  setInterval(checkHealth, 30_000);
-}
-
 // Sync pane-parent margin-bottom to match current terminal height
 function syncPaneParentMargin() {
   const terminalGlobal = document.getElementById('terminal-global');
   const paneParent = document.querySelector('.pane-parent');
   if (terminalGlobal && paneParent) {
-    const height = terminalGlobal.getBoundingClientRect().height;
     paneParent.style.marginBottom = `0px`;
   }
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+async function init() {
+  await checkHealth();
+  await loadTree();
+  initResizers();
+  syncPaneParentMargin();
+  setInterval(checkHealth, 30_000);
 }
 
 // Ensure init runs after DOM is ready (handles reloads reliably)
