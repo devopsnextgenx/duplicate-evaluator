@@ -369,6 +369,15 @@ h3 {
   flex-direction: column;
 }
 
+.pane-within,
+[id^="pane-"] {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 /* ── Tabs ──────────────────────────────────────────────────── */
 .tabs {
   display: flex;
@@ -436,6 +445,7 @@ h3 {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  height: auto;
 }
 
 .report-toolbar {
