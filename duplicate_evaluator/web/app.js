@@ -1159,29 +1159,46 @@ function initResizers() {
   // Terminal resizer for global terminal
   const terminalResizer = document.getElementById('terminal-resizer');
   const terminalGlobal = document.getElementById('terminal-global');
-  if (terminalResizer && terminalGlobal) {
+  const paneParent = document.querySelector('.pane-parent');
+
+  if (terminalResizer && terminalGlobal && paneParent) {
     terminalResizer.addEventListener('mousedown', (e) => {
       e.preventDefault();
       terminalResizer.classList.add('active');
       document.body.style.cursor = 'row-resize';
+      document.body.style.userSelect = 'none';
 
       const startHeight = terminalGlobal.getBoundingClientRect().height;
       const startY = e.clientY;
+      const panelHeight = document.querySelector('.panel-right').getBoundingClientRect().height;
 
       const doDrag = (moveEvent) => {
         const deltaY = startY - moveEvent.clientY;
         let newHeight = startHeight + deltaY;
         const minHeight = 120;
-        const maxHeight = window.innerHeight - 200;
+        const maxHeight = panelHeight - 200; // Leave at least 200px for pane-parent
+
         if (newHeight < minHeight) newHeight = minHeight;
         if (newHeight > maxHeight) newHeight = maxHeight;
+
+        // Update terminal height
         terminalGlobal.style.height = `${newHeight}px`;
+
+        // Update CSS variable (used by resizer bottom position)
         document.documentElement.style.setProperty('--terminal-height', `${newHeight}px`);
+
+        // CRITICAL: Update pane-parent margin-bottom to match new terminal height
+        // This prevents table rows from being hidden behind the terminal
+        paneParent.style.marginBottom = `${newHeight}px`;
+
+        // Update resizer position directly (since it uses bottom: var(--terminal-height))
+        terminalResizer.style.bottom = `${newHeight}px`;
       };
 
       const stopDrag = () => {
         terminalResizer.classList.remove('active');
         document.body.style.cursor = '';
+        document.body.style.userSelect = '';
         document.removeEventListener('mousemove', doDrag);
         document.removeEventListener('mouseup', stopDrag);
       };
@@ -1198,8 +1215,21 @@ async function init() {
   await loadTree();
   initResizers();
 
+  // Sync pane-parent margin-bottom with initial terminal height
+  syncPaneParentMargin();
+
   // Periodic health check every 30s
   setInterval(checkHealth, 30_000);
+}
+
+// Sync pane-parent margin-bottom to match current terminal height
+function syncPaneParentMargin() {
+  const terminalGlobal = document.getElementById('terminal-global');
+  const paneParent = document.querySelector('.pane-parent');
+  if (terminalGlobal && paneParent) {
+    const height = terminalGlobal.getBoundingClientRect().height;
+    paneParent.style.marginBottom = `${height}px`;
+  }
 }
 
 // Ensure init runs after DOM is ready (handles reloads reliably)

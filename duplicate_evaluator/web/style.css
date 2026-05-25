@@ -365,7 +365,7 @@ h3 {
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-  /* Account for terminal height so pane-parent ends above terminal */
+  /* Dynamic margin-bottom updated by JS to match terminal height */
   margin-bottom: var(--terminal-height);
 }
 
@@ -695,10 +695,9 @@ h3 {
   background: #0a0c0f;
 }
 
+/* FIXED: terminal-global is fixed at bottom of panel-right */
 .terminal-global {
   position: fixed;
-  /* Position exactly below pane-parent (which has margin-bottom: var(--terminal-height)) */
-  /* pane-parent is inside panel-right, so we align with panel-right */
   left: var(--sidebar-width);
   right: 0;
   bottom: 0;
@@ -708,6 +707,7 @@ h3 {
   border-top-right-radius: 12px;
 }
 
+/* FIXED: terminal-resizer is fixed above terminal-global */
 .terminal-resizer {
   position: fixed;
   left: var(--sidebar-width);
