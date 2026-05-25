@@ -655,7 +655,7 @@ function renderReport(report, tab) {
     tr.dataset.path = file.path;
     tr.dataset.filename = file.filename;
     tr.innerHTML = `
-      <td style="color:var(--text-muted);font-size:0.7rem">${idx + 1}</td>
+      <td style="color:var(--text-muted);font-size:0.7rem" title="${escHtml(file.filename)}">${idx + 1}</td>
       <td class="td-filename">${filenameHtml}</td>
       <td>${playBtnHtml}</td>
       <td class="td-size">${humanSize(file.size_bytes)}</td>
