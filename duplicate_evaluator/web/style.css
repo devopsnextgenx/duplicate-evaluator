@@ -769,7 +769,9 @@ h3 {
 
 .terminal-output {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.75rem 1rem;
   font-family: var(--font-mono);
   font-size: 0.75rem;
