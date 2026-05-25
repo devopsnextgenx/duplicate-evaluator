@@ -81,8 +81,13 @@ def load_config(path: Path = CONFIG_PATH) -> AppConfig:
         except ValueError:
             raise ValueError("DUPEVAL_PORT must be an integer")
 
+    # LLM endpoint: allow direct override via DUPEVAL_LLM_BASE_URL, or construct from host+port
     if env_llm_base_url := os.environ.get("DUPEVAL_LLM_BASE_URL"):
         raw.setdefault("llm", {})["base_url"] = env_llm_base_url
+    elif (env_llm_host := os.environ.get("DUPEVAL_LLM_HOST")) and (
+        env_llm_port := os.environ.get("DUPEVAL_LLM_PORT")
+    ):
+        raw.setdefault("llm", {})["base_url"] = f"http://{env_llm_host}:{env_llm_port}/v1"
 
     return AppConfig.model_validate(raw)
 
