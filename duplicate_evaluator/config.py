@@ -68,7 +68,7 @@ def load_config(path: Path = CONFIG_PATH) -> AppConfig:
     else:
         raw = {}
 
-    # Allow Docker / environment overrides for the media root and server details
+    # Allow Docker / environment overrides for the media root, server details, and LLM endpoint
     if env_target := os.environ.get("DUPEVAL_TARGET_PATH"):
         raw.setdefault("media", {})["target_path"] = env_target
 
@@ -80,6 +80,9 @@ def load_config(path: Path = CONFIG_PATH) -> AppConfig:
             raw.setdefault("server", {})["port"] = int(env_port)
         except ValueError:
             raise ValueError("DUPEVAL_PORT must be an integer")
+
+    if env_llm_base_url := os.environ.get("DUPEVAL_LLM_BASE_URL"):
+        raw.setdefault("llm", {})["base_url"] = env_llm_base_url
 
     return AppConfig.model_validate(raw)
 

@@ -11,7 +11,8 @@ services:
     environment:
       # Override the media root inside the container.
       DUPEVAL_TARGET_PATH: /data/media
+      DUPEVAL_LLM_BASE_URL: http://host.docker.internal:11434/v1
     volumes:
       - ./config.yml:/app/config.yml:ro
-      - ${TARGET_PATH:-./media/target}:/data/media:rw
+      - ${TARGET_PATH:-/media/zbox/Crucial-X6/ShareMe/media/songs/target}:/data/media:rw
     restart: unless-stopped
