@@ -1323,6 +1323,46 @@ h3 {
   accent-color: var(--accent-blue);
 }
 
+.progress-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 1rem;
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  overflow: hidden;
+  color: var(--text-secondary);
+}
+
+.progress-bar::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 0;
+  background: var(--accent-blue);
+  transition: width var(--transition);
+}
+
+.progress-label {
+  position: relative;
+  z-index: 1;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Auto-save Status Badge ───────────────────────────────── */
 .auto-save-status {
   display: inline-flex;

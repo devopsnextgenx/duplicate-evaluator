@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from duplicate_evaluator.models.file_entry import ActionType
-from duplicate_evaluator.services.reporter import load_report, save_report
+from duplicate_evaluator.services.reporter import clear_report_files, load_report, save_report
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -65,4 +66,31 @@ async def update_report_actions(req: UpdateReportActionsRequest) -> JSONResponse
         "status": "success",
         "updated_count": updated_count,
         "folder_path": req.folder_path
+    })
+
+
+class ClearReportRequest(BaseModel):
+    folder_paths: list[str]
+    recursive: bool = True
+
+
+@router.post("/report/clear")
+async def clear_reports(req: ClearReportRequest) -> JSONResponse:
+    """Clear generated report and execution result JSON files under one or more folders."""
+    logger.info("POST /api/report/clear — %d folders, recursive=%s", len(req.folder_paths), req.recursive)
+    results = []
+
+    for folder_path in req.folder_paths:
+        folder = Path(folder_path)
+        if not folder.is_dir():
+            raise HTTPException(status_code=404, detail=f"Folder path not found: {folder_path}")
+
+        deleted = clear_report_files(folder_path, recursive=req.recursive)
+        results.append({"folder_path": folder_path, "deleted": deleted})
+
+    total_deleted = sum(item["deleted"] for item in results)
+    return JSONResponse({
+        "status": "success",
+        "total_deleted": total_deleted,
+        "results": results,
     })

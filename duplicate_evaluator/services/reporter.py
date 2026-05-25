@@ -12,6 +12,7 @@ from duplicate_evaluator.models.file_entry import FolderReport
 logger = logging.getLogger(__name__)
 
 REPORT_FILENAME = "_report.json"
+EXECUTED_FILENAME = "_executed.json"
 
 
 def save_report(report: FolderReport) -> Path:
@@ -54,3 +55,33 @@ def load_report(folder_path: str) -> Optional[FolderReport]:
 def report_path(folder_path: str) -> Path:
     """Return the expected report file path for a folder."""
     return Path(folder_path) / REPORT_FILENAME
+
+
+def clear_report_files(folder_path: str, recursive: bool = True) -> int:
+    """Remove generated report and execution JSON files from a folder tree."""
+    root = Path(folder_path)
+    if not root.is_dir():
+        return 0
+
+    deleted = 0
+    file_names = {REPORT_FILENAME, EXECUTED_FILENAME}
+    if recursive:
+        for path in root.rglob("*"):
+            if path.is_file() and path.name in file_names:
+                try:
+                    path.unlink()
+                    deleted += 1
+                except OSError as exc:
+                    logger.warning("Failed to delete %s: %s", path, exc)
+    else:
+        for name in file_names:
+            path = root / name
+            if path.is_file():
+                try:
+                    path.unlink()
+                    deleted += 1
+                except OSError as exc:
+                    logger.warning("Failed to delete %s: %s", path, exc)
+
+    logger.info("Cleared %d report/executed files from %s", deleted, folder_path)
+    return deleted

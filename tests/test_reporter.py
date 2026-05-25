@@ -81,3 +81,22 @@ class TestReporter:
         p = report_path(str(tmp_path))
         assert p.name == "_report.json"
         assert p.parent == tmp_path
+    # Verify that report path helper excludes executed markers
+
+
+def test_clear_report_files_recursive(tmp_path: Path):
+    root = tmp_path / "actress"
+    root.mkdir()
+    (root / "_report.json").write_text("{}", encoding="utf-8")
+    (root / "_executed.json").write_text("{}", encoding="utf-8")
+
+    child = root / "nested"
+    child.mkdir()
+    (child / "_report.json").write_text("{}", encoding="utf-8")
+
+    deleted = clear_report_files(str(root), recursive=True)
+
+    assert deleted == 3
+    assert not (root / "_report.json").exists()
+    assert not (root / "_executed.json").exists()
+    assert not (child / "_report.json").exists()

@@ -23,6 +23,7 @@ const state = {
     cross: null,
   },
   expandedPaths: new Set(), // Track expanded tree node paths
+  scanProgress: { total: 0, completed: 0 },
 };
 
 // ── localStorage Tree State Persistence ──────────────────────────
@@ -284,7 +285,6 @@ function renderTree(nodes, parentEl, depth) {
     }
 
     label.innerHTML = `
-      ${hasChildren ? '<span class="tree-chevron">▶</span>' : '<span style="width:0.8em;display:inline-block"></span>'}
       ${dotHtml}
       <span class="icon">${icon}</span>
       <span class="name" title="${escHtml(node.path)}">${escHtml(node.name)}</span>
@@ -292,13 +292,20 @@ function renderTree(nodes, parentEl, depth) {
       ${rescanHtml}
     `;
 
+    if (hasChildren) {
+      const chevron = document.createElement('span');
+      chevron.className = 'tree-chevron';
+      chevron.textContent = '▶';
+      label.prepend(chevron);
+    }
+
     li.appendChild(label);
 
-    if (node.type === 'actress') {
-      label.style.cursor = 'pointer';
-      label.addEventListener('click', (e) => {
-        e.stopPropagation();
+    label.addEventListener('click', (e) => {
+      if (e.target.closest('.tree-chevron')) return;
+      e.stopPropagation();
 
+      if (node.type === 'actress') {
         if (e.target.classList && e.target.classList.contains('rescan-btn')) {
           selectNode(node, label);
           startScan(true, node);
@@ -366,17 +373,34 @@ function renderTree(nodes, parentEl, depth) {
         } else {
           showEmptyReport(state.activeTab, `No report found. Click "Scan Selected Folder" to analyse.`);
         }
-      });
-
-      const rescanBtn = label.querySelector('.rescan-btn');
-      if (rescanBtn) {
-        rescanBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          selectNode(node, label);
-          startScan(true, node);
-        });
+        return;
       }
-    }
+
+      if (e.ctrlKey || e.metaKey) {
+        const descendantActresses = collectDescendantActressNodes(node);
+        descendantActresses.forEach((actressNode) => state.selectedNodes.set(actressNode.path, actressNode));
+        state.selectedNode = null;
+        state.lastSelectedPath = descendantActresses[descendantActresses.length - 1]?.path || state.lastSelectedPath;
+        updateSelectionSummary();
+        updateScanButton();
+        updateTreeSelectionUI();
+        saveTreeState();
+        return;
+      }
+
+      document.querySelectorAll('.tree-label.active').forEach(el => el.classList.remove('active'));
+      label.classList.add('active');
+
+      document.querySelectorAll('.tree-label.selected').forEach(el => el.classList.remove('selected'));
+      state.selectedNodes.clear();
+
+      state.selectedNode = node;
+      updateSelectionSummary();
+      updateScanButton();
+      saveTreeState();
+
+      showEmptyReport(state.activeTab, `Ready to scan all folders under ${node.name}.`);
+    });
 
     if (hasChildren) {
       const childUl = document.createElement('ul');
@@ -391,20 +415,23 @@ function renderTree(nodes, parentEl, depth) {
       renderTree(node.children, childUl, depth + 1);
       li.appendChild(childUl);
 
-      label.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const isOpen = childUl.classList.contains('open');
-        const nextOpen = !isOpen;
-        childUl.classList.toggle('open', nextOpen);
-        label.classList.toggle('expanded', nextOpen);
+      const chevron = label.querySelector('.tree-chevron');
+      if (chevron) {
+        chevron.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const isOpen = childUl.classList.contains('open');
+          const nextOpen = !isOpen;
+          childUl.classList.toggle('open', nextOpen);
+          label.classList.toggle('expanded', nextOpen);
 
-        if (nextOpen) {
-          state.expandedPaths.add(node.path);
-        } else {
-          state.expandedPaths.delete(node.path);
-        }
-        saveTreeState();
-      });
+          if (nextOpen) {
+            state.expandedPaths.add(node.path);
+          } else {
+            state.expandedPaths.delete(node.path);
+          }
+          saveTreeState();
+        });
+      }
     }
 
     parentEl.appendChild(li);
@@ -414,9 +441,10 @@ function renderTree(nodes, parentEl, depth) {
 function getNodeFromLabel(label) {
   const nameSpan = label.querySelector('.name');
   const path = nameSpan?.getAttribute('title');
-  const name = nameSpan?.textContent;
   if (!path) return null;
-  return { path, name };
+  const node = findNodeByPath(_cachedTreeData, path);
+  if (node) return node;
+  return { path, name: nameSpan?.textContent || '' };
 }
 
 function getIcon(node) {
@@ -444,26 +472,44 @@ function selectNode(node, labelEl) {
 }
 
 function updateScanButton() {
-  const btn = document.getElementById('btn-scan-folder');
-  if (!btn) return;
-  const selectedCount = state.selectedNodes.size;
+  const scanBtn = document.getElementById('btn-scan-folder');
+  const clearBtn = document.getElementById('btn-clear-reports');
   if (state.activeTab === 'lang') {
-    btn.disabled = true;
-    btn.innerHTML = `<span>🔍</span> Scan Selected Folder`;
+    if (scanBtn) {
+      scanBtn.disabled = true;
+      scanBtn.innerHTML = `<span>🔍</span> Scan Selected Folder`;
+    }
+    if (clearBtn) {
+      clearBtn.disabled = true;
+      clearBtn.innerHTML = `<span>🧹</span> Clear Report Files`;
+    }
     return;
   }
 
-  if (selectedCount > 0) {
-    btn.disabled = false;
-    btn.innerHTML = `<span>🔍</span> Scan Selected Folders (${selectedCount})`;
-    return;
+  const selectedCount = state.selectedNodes.size;
+
+  if (scanBtn) {
+    if (selectedCount > 0) {
+      scanBtn.disabled = false;
+      scanBtn.innerHTML = `<span>🔍</span> Scan Selected Folders (${selectedCount})`;
+    } else {
+      scanBtn.disabled = !state.selectedNode;
+      scanBtn.innerHTML = state.selectedNode
+        ? `<span>🔍</span> Scan: ${escHtml(state.selectedNode.name)}`
+        : `<span>🔍</span> Scan Selected Folder`;
+    }
   }
 
-  btn.disabled = !state.selectedNode;
-  if (state.selectedNode) {
-    btn.innerHTML = `<span>🔍</span> Scan: ${escHtml(state.selectedNode.name)}`;
-  } else {
-    btn.innerHTML = `<span>🔍</span> Scan Selected Folder`;
+  if (clearBtn) {
+    if (selectedCount > 0) {
+      clearBtn.disabled = false;
+      clearBtn.innerHTML = `<span>🧹</span> Clear Reports (${selectedCount})`;
+    } else {
+      clearBtn.disabled = !state.selectedNode;
+      clearBtn.innerHTML = state.selectedNode
+        ? `<span>🧹</span> Clear Reports`
+        : `<span>🧹</span> Clear Report Files`;
+    }
   }
 }
 
@@ -498,12 +544,77 @@ function updateSelectionSummary() {
   if (!summary) return;
   const count = state.selectedNodes.size;
   if (count === 0) {
-    summary.textContent = 'Select one or more actress folders to scan.';
+    if (state.selectedNode && state.selectedNode.type === 'quality') {
+      summary.textContent = `Selected quality tier: ${state.selectedNode.name}. Scan will submit all child folders.`;
+    } else if (state.selectedNode && state.selectedNode.type === 'language') {
+      summary.textContent = `Selected language group: ${state.selectedNode.name}. Scan will submit all child folders.`;
+    } else {
+      summary.textContent = 'Select one or more actress folders to scan.';
+    }
   } else if (count === 1) {
     summary.textContent = '1 folder selected for bulk scan.';
   } else {
     summary.textContent = `${count} folders selected for bulk scan.`;
   }
+}
+
+function isAlreadyScanned(node) {
+  return Boolean(node && node.scan_status && node.scan_status !== 'none');
+}
+
+function collectDescendantActressNodes(node) {
+  if (!node) return [];
+  if (node.type === 'actress') return [node];
+  if (!node.children || node.children.length === 0) return [];
+  return node.children.flatMap((child) => collectDescendantActressNodes(child));
+}
+
+function updateTreeSelectionUI() {
+  document.querySelectorAll('.tree-label').forEach((label) => {
+    const nameSpan = label.querySelector('.name');
+    if (!nameSpan) return;
+    const path = nameSpan.getAttribute('title');
+    if (state.selectedNodes.has(path)) {
+      label.classList.add('selected');
+    } else {
+      label.classList.remove('selected');
+    }
+  });
+}
+
+function getScanTargetsFromNodes(nodes, isRescan = false) {
+  const seen = new Set();
+  const targets = [];
+
+  function walk(current) {
+    if (!current || !current.path) return;
+    if (current.type === 'actress') {
+      if (seen.has(current.path)) return;
+      seen.add(current.path);
+      if (!isRescan && isAlreadyScanned(current)) return;
+      targets.push(current);
+      return;
+    }
+    if (current.children && current.children.length) {
+      current.children.forEach(walk);
+    }
+  }
+
+  nodes.forEach(walk);
+  return targets;
+}
+
+function updateProgressBar(completed, total, label = '') {
+  const fill = document.getElementById('progress-fill');
+  const text = document.getElementById('progress-label');
+  const percent = total ? Math.round((completed / total) * 100) : 0;
+  if (fill) fill.style.width = `${percent}%`;
+  if (text) text.textContent = label || `${percent}% (${completed}/${total})`;
+}
+
+function resetProgressBar() {
+  state.scanProgress = { total: 0, completed: 0 };
+  updateProgressBar(0, 0, '');
 }
 
 // ── Auto-Save & Manual Execution Helpers ─────────────────────────
@@ -892,10 +1003,54 @@ function selectAllRadio(tab, value) {
   }
 }
 
+async function clearReports() {
+  const selectedFolders = getSelectedFolders();
+  if (selectedFolders.length === 0) {
+    toast('No folder selected to clear reports.', 'info');
+    return;
+  }
+
+  const clearTargets = getScanTargetsFromNodes(selectedFolders, true);
+  if (clearTargets.length === 0) {
+    toast('No valid folders found to clear reports.', 'info');
+    return;
+  }
+
+  if (!confirm(`Clear report metadata for ${clearTargets.length} selected folder(s)? This will recursively remove only _report.json and _executed.json files.`)) {
+    return;
+  }
+
+  appendTerminal(`=== Clearing report files for ${clearTargets.length} folder(s) ===`, 'info');
+  try {
+    const result = await api.post('/api/report/clear', {
+      folder_paths: clearTargets.map(node => node.path),
+      recursive: true,
+    });
+
+    appendTerminal(`Cleared ${result.total_deleted} report files.`, 'info');
+    toast(`Removed ${result.total_deleted} report files`, 'success', 5000);
+    await loadTree();
+  } catch (e) {
+    appendTerminal(`❌ Error: ${e.message}`, 'error');
+    toast(`Failed to clear report files: ${e.message}`, 'error');
+  }
+}
+
 async function startScan(isRescan = false, targetNode = null) {
   const selectedFolders = targetNode ? [targetNode] : getSelectedFolders();
   if (selectedFolders.length === 0) {
     toast('No folder selected to scan', 'info');
+    return;
+  }
+
+  const scanTargets = getScanTargetsFromNodes(selectedFolders, isRescan);
+  if (scanTargets.length === 0) {
+    const hasAnyTargets = getScanTargetsFromNodes(selectedFolders, true).length > 0;
+    if (hasAnyTargets) {
+      toast('All selected folders were already scanned. Use Rescan to re-run them.', 'info');
+    } else {
+      toast('No valid folders found to scan.', 'info');
+    }
     return;
   }
 
@@ -905,10 +1060,10 @@ async function startScan(isRescan = false, targetNode = null) {
 
   const scanBtn = document.getElementById('btn-scan-folder');
   if (scanBtn) scanBtn.disabled = true;
-  appendTerminal(`=== ${actionLabel} started for ${selectedFolders.length} folder(s) (${tab}) ===`, 'info');
+  appendTerminal(`=== ${actionLabel} started for ${scanTargets.length} folder(s) (${tab}) ===`, 'info');
 
   if (!targetNode && selectedFolders.length > 1) {
-    showEmptyReport(tab, `Scanning ${selectedFolders.length} selected folders…`);
+    showEmptyReport(tab, `Scanning ${scanTargets.length} selected folders…`);
   } else {
     showEmptyReport(tab, 'Analyzing folders…');
   }
@@ -922,12 +1077,25 @@ async function startScan(isRescan = false, targetNode = null) {
       </div>`;
   }
 
+  state.scanProgress = { total: scanTargets.length, completed: 0 };
+  updateProgressBar(0, scanTargets.length, `0 / ${scanTargets.length} folders scanned`);
   syncPaneParentMargin();
 
-  const jobs = selectedFolders.map((node) => runFolderScan(node, isRescan, mode));
-  await Promise.all(jobs);
+  for (const node of scanTargets) {
+    await runFolderScan(node, isRescan, mode);
+    state.scanProgress.completed += 1;
+    updateProgressBar(state.scanProgress.completed, state.scanProgress.total, `${state.scanProgress.completed} / ${state.scanProgress.total} folders scanned`);
+  }
 
   if (scanBtn) scanBtn.disabled = false;
+  appendTerminal(`=== ${actionLabel} finished: ${state.scanProgress.completed}/${state.scanProgress.total} folders scanned ===`, 'info');
+  updateProgressBar(state.scanProgress.completed, state.scanProgress.total, `Finished ${state.scanProgress.completed} / ${state.scanProgress.total}`);
+  setTimeout(() => {
+    if (state.scanProgress.completed === state.scanProgress.total) {
+      resetProgressBar();
+    }
+  }, 5000);
+
   refreshTreeUI();
 }
 
@@ -1030,6 +1198,7 @@ document.getElementById('btn-refresh-tree').addEventListener('click', () => {
 });
 
 document.getElementById('btn-scan-folder').addEventListener('click', startScan);
+document.getElementById('btn-clear-reports').addEventListener('click', clearReports);
 document.getElementById('btn-dry-run').addEventListener('click', () => runExecute('within', true));
 document.getElementById('btn-exec-delete').addEventListener('click', () => {
   if (!confirm('Execute DELETE on selected files? This cannot be undone.')) return;

@@ -55,6 +55,9 @@
         <button id="btn-scan-folder" class="btn btn-primary" style="width:100%" disabled>
           <span>🔍</span> Scan Selected Folder
         </button>
+        <button id="btn-clear-reports" class="btn btn-ghost" style="width:100%" disabled>
+          <span>🧹</span> Clear Report Files
+        </button>
         <div id="selection-summary" class="selection-summary" style="font-size:0.82rem;color:var(--text-muted);">
           Select one or more actress folders to scan.
         </div>
@@ -178,6 +181,10 @@
         <pre id="terminal-output-global" class="terminal-output"></pre>
       </div>
     </main>
+  </div>
+  <div class="progress-bar">
+    <div class="progress-fill" id="progress-fill"></div>
+    <span class="progress-label" id="progress-label"></span>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════════
