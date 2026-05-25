@@ -725,9 +725,10 @@ async function markFolderExecuted(tab) {
     return;
   }
 
-  if (!confirm(`Are you sure you want to mark "${report.actress || report.folder_path}" as executed manually?`)) {
-    return;
-  }
+  // TODO
+  // if (!confirm(`Are you sure you want to mark "${report.actress || report.folder_path}" as executed manually?`)) {
+  //   return;
+  // }
 
   try {
     await api.post('/api/execute/mark-executed', {
