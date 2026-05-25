@@ -90,63 +90,65 @@
           </button>
         </nav>
         <!-- Tab panes -->
-        <div id="pane-within" class="report-panel tab-pane active">
-          <!-- Toolbar -->
-          <div class="report-toolbar" id="toolbar-within" style="display:none">
-            <div style="flex:1;min-width:0">
-              <div class="report-title" id="report-title-within">—</div>
-              <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
-                <div class="report-meta" id="report-meta-within"></div>
-                <span id="auto-save-status-within" class="auto-save-status"></span>
+         <div class="report-panel">
+          <div id="pane-within" class="tab-pane active">
+            <!-- Toolbar -->
+            <div class="report-toolbar" id="toolbar-within" style="display:none">
+              <div style="flex:1;min-width:0">
+                <div class="report-title" id="report-title-within">—</div>
+                <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+                  <div class="report-meta" id="report-meta-within"></div>
+                  <span id="auto-save-status-within" class="auto-save-status"></span>
+                </div>
+              </div>
+              <button id="btn-mark-executed-within" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
+                Executed</button>
+              <button id="btn-rescan-within" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄
+                Rescan</button>
+            </div>
+            <!-- Table -->
+            <div class="table-wrapper" id="table-wrapper-within">
+              <div class="empty-state">
+                <div class="icon">🎬</div>
+                <p>Select an actress folder from the tree on the left, then click <strong>Scan Selected Folder</strong> to
+                  analyse duplicates.</p>
               </div>
             </div>
-            <button id="btn-mark-executed-within" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
-              Executed</button>
-            <button id="btn-rescan-within" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄
-              Rescan</button>
           </div>
-          <!-- Table -->
-          <div class="table-wrapper" id="table-wrapper-within">
-            <div class="empty-state">
-              <div class="icon">🎬</div>
-              <p>Select an actress folder from the tree on the left, then click <strong>Scan Selected Folder</strong> to
-                analyse duplicates.</p>
-            </div>
-          </div>
-        </div>
 
-        <div id="pane-cross" class="report-panel tab-pane" style="display:none">
-          <!-- Toolbar -->
-          <div class="report-toolbar" id="toolbar-cross" style="display:none">
-            <div style="flex:1;min-width:0">
-              <div class="report-title" id="report-title-cross">—</div>
-              <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
-                <div class="report-meta" id="report-meta-cross"></div>
-                <span id="auto-save-status-cross" class="auto-save-status"></span>
+          <div id="pane-cross" class="tab-pane" style="display:none">
+            <!-- Toolbar -->
+            <div class="report-toolbar" id="toolbar-cross" style="display:none">
+              <div style="flex:1;min-width:0">
+                <div class="report-title" id="report-title-cross">—</div>
+                <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+                  <div class="report-meta" id="report-meta-cross"></div>
+                  <span id="auto-save-status-cross" class="auto-save-status"></span>
+                </div>
+              </div>
+              <button id="btn-cross-mark-executed" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
+                Executed</button>
+              <button id="btn-rescan-cross" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄 Rescan</button>
+            </div>
+            <!-- Table -->
+            <div class="table-wrapper" id="table-wrapper-cross">
+              <div class="empty-state">
+                <div class="icon">🔀</div>
+                <p>Select an actress folder from the tree, then click <strong>Scan Selected Folder</strong> on the <em>Cross
+                    Quality</em> tab to find songs duplicated across xhd/hd/sd tiers.</p>
               </div>
             </div>
-            <button id="btn-cross-mark-executed" class="btn btn-ghost btn-sm" style="color:var(--accent-green)">✓ Mark
-              Executed</button>
-            <button id="btn-rescan-cross" class="btn btn-ghost btn-sm" style="color:var(--accent-blue)">🔄 Rescan</button>
           </div>
-          <!-- Table -->
-          <div class="table-wrapper" id="table-wrapper-cross">
-            <div class="empty-state">
-              <div class="icon">🔀</div>
-              <p>Select an actress folder from the tree, then click <strong>Scan Selected Folder</strong> on the <em>Cross
-                  Quality</em> tab to find songs duplicated across xhd/hd/sd tiers.</p>
+
+          <div id="pane-lang" class="tab-pane" style="display:none">
+            <div class="wip-banner">
+              <div class="wip-badge">🚧 Work In Progress</div>
+              <h2 style="color:var(--text-secondary)">Cross-Language Analysis</h2>
+              <p>This feature will identify duplicate songs that span across multiple language folders. It requires careful
+                cross-folder comparison logic and is currently under development.</p>
             </div>
           </div>
-        </div>
-
-        <div id="pane-lang" class="report-panel tab-pane" style="display:none">
-          <div class="wip-banner">
-            <div class="wip-badge">🚧 Work In Progress</div>
-            <h2 style="color:var(--text-secondary)">Cross-Language Analysis</h2>
-            <p>This feature will identify duplicate songs that span across multiple language folders. It requires careful
-              cross-folder comparison logic and is currently under development.</p>
-          </div>
-        </div>
+         </div>
       </div>
       <!-- Terminal Resizer and Terminal -->
       <div class="terminal-resizer" id="terminal-resizer"></div>

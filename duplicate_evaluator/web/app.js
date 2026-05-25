@@ -1189,7 +1189,7 @@ function initResizers() {
 
         // CRITICAL: Update pane-parent margin-bottom to match new terminal height
         // This prevents table rows from being hidden behind the terminal
-        paneParent.style.marginBottom = `${newHeight}px`;
+        paneParent.style.marginBottom = `0px`;
 
         // Update resizer position directly (since it uses bottom: var(--terminal-height))
         terminalResizer.style.bottom = `${newHeight}px`;
@@ -1228,7 +1228,7 @@ function syncPaneParentMargin() {
   const paneParent = document.querySelector('.pane-parent');
   if (terminalGlobal && paneParent) {
     const height = terminalGlobal.getBoundingClientRect().height;
-    paneParent.style.marginBottom = `${height}px`;
+    paneParent.style.marginBottom = `0px`;
   }
 }
 

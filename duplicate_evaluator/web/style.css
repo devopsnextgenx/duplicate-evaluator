@@ -349,24 +349,24 @@ h3 {
 
 /* ── Right Panel — Report ──────────────────────────────────── */
 .panel-right {
-  flex: 1;
+  position: fixed;
+  top: 52px;
+  bottom: 0;
+  right: 0;
+  left: var(--sidebar-width);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  height: 100%;
-  max-height: 100%;
   background: var(--bg-base);
-  position: relative;
 }
 
 .pane-parent {
   flex: 1;
+  min-height: 0;
+  max-height: calc(100% - 6px);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
-  /* Dynamic margin-bottom updated by JS to match terminal height */
-  margin-bottom: var(--terminal-height);
 }
 
 /* ── Tabs ──────────────────────────────────────────────────── */
@@ -432,10 +432,10 @@ h3 {
 /* ── Report Panel Content ──────────────────────────────────── */
 .report-panel {
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  min-height: 0;
 }
 
 .report-toolbar {
@@ -495,10 +495,10 @@ h3 {
 /* ── Table ─────────────────────────────────────────────────── */
 .table-wrapper {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: auto;
   padding: 0;
-  min-height: 0;
 }
 
 /* Report table specific styles */
@@ -697,24 +697,19 @@ h3 {
 
 /* FIXED: terminal-global is fixed at bottom of panel-right */
 .terminal-global {
-  position: fixed;
-  left: var(--sidebar-width);
-  right: 0;
-  bottom: 0;
-  z-index: 50;
-  width: auto;
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
+  flex-shrink: 0;
+  height: var(--terminal-height);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  background: #0a0c0f;
+  overflow: hidden;
 }
 
 /* FIXED: terminal-resizer is fixed above terminal-global */
 .terminal-resizer {
-  position: fixed;
-  left: var(--sidebar-width);
-  right: 0;
-  bottom: var(--terminal-height);
+  flex-shrink: 0;
   height: 6px;
-  width: auto;
   background: var(--border);
   cursor: row-resize;
   z-index: 55;
