@@ -698,49 +698,6 @@ function renderReport(report, tab) {
     });
   });
 
-  // Show similar-files popup on hover for duplicate rows
-  const createSimilarPopup = (files, anchorRect) => {
-    removeSimilarPopup();
-    if (!files || files.length === 0) return null;
-    const popup = document.createElement('div');
-    popup.className = 'similar-popup';
-    popup.id = 'similar-popup';
-    const title = document.createElement('h4');
-    title.textContent = 'Similar files';
-    popup.appendChild(title);
-    const ul = document.createElement('ul');
-    files.forEach(f => {
-      const li = document.createElement('li');
-      const folder = f.folder || f.quality || f.tier || '';
-      const spanFolder = document.createElement('span');
-      spanFolder.className = 'sf-folder';
-      if (folder) spanFolder.textContent = `[${folder}]`;
-      const spanName = document.createElement('span');
-      spanName.className = 'sf-fname';
-      spanName.textContent = f.filename || f.file || f.name || '';
-      li.appendChild(spanFolder);
-      li.appendChild(spanName);
-      ul.appendChild(li);
-    });
-    popup.appendChild(ul);
-    document.body.appendChild(popup);
-
-    // Position to the right of the anchor rect, but keep on-screen
-    const left = Math.min(window.innerWidth - 240, anchorRect.right + 8);
-    let top = anchorRect.top;
-    if (top + popup.offsetHeight > window.innerHeight) {
-      top = Math.max(8, window.innerHeight - popup.offsetHeight - 8);
-    }
-    popup.style.left = `${left}px`;
-    popup.style.top = `${top}px`;
-    return popup;
-  };
-
-  const removeSimilarPopup = () => {
-    const ex = document.getElementById('similar-popup');
-    if (ex) ex.remove();
-  };
-
   // Attach hover handlers to table rows
   tbody.querySelectorAll('tr').forEach((tr, index) => {
     const entry = report.entries && report.entries[index];
@@ -750,11 +707,8 @@ function renderReport(report, tab) {
       if (!tr.classList.contains('is-duplicate')) return;
       const files = tr._similarFiles || [];
       if (!files || files.length === 0) return;
-      const rect = tr.getBoundingClientRect();
-      createSimilarPopup(files, rect);
     });
     tr.addEventListener('mouseleave', () => {
-      removeSimilarPopup();
     });
   });
 
