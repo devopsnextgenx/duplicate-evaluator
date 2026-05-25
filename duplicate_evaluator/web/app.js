@@ -160,7 +160,6 @@ function escHtml(str) {
   return d.innerHTML;
 }
 
-// Render the tree interface directly using currently cached data structures
 function refreshTreeUI() {
   const treeEl = document.getElementById('folder-tree');
   if (!_cachedTreeData || !treeEl) return;
@@ -203,6 +202,7 @@ document.querySelectorAll('.tab').forEach(tab => {
     state.activeTab = target;
     updateScanButton();
     saveTreeState();
+    syncPaneParentMargin();
   });
 });
 
@@ -235,14 +235,12 @@ async function loadTree() {
       return;
     }
 
-    // CRITICAL FIX: Pre-populate state references BEFORE drawing elements to the screen
     restoreTreeState(tree);
 
     renderTree(tree.children || [], treeEl, 0);
     updateSelectionSummary();
     updateScanButton();
 
-    // Automatically trigger data load for the restored folder choice
     if (state.selectedNode) {
       if (state.selectedNode.has_report) {
         loadReport(state.selectedNode.path, state.activeTab);
@@ -264,16 +262,14 @@ function renderTree(nodes, parentEl, depth) {
     label.className = 'tree-label';
     label.style.paddingLeft = `${0.75 + depth * 1}rem`;
 
-    // FIX: Apply active visual styling if this node matches the restored single selection
     if (state.selectedNode && node.path === state.selectedNode.path) {
       label.classList.add('active');
-      state.selectedNode = node; // Update structure references
+      state.selectedNode = node;
     }
 
-    // FIX: Apply bulk selection indicators if part of multi-select list
     if (state.selectedNodes.has(node.path)) {
       label.classList.add('selected');
-      state.selectedNodes.set(node.path, node); // Update structure references
+      state.selectedNodes.set(node.path, node);
     }
 
     const icon = getIcon(node);
@@ -386,7 +382,6 @@ function renderTree(nodes, parentEl, depth) {
       const childUl = document.createElement('ul');
       childUl.className = 'tree-children';
 
-      // FIX: Check memory context and force UI layouts to drop open immediately
       const shouldBeOpen = state.expandedPaths.has(node.path);
       if (shouldBeOpen) {
         childUl.classList.add('open');
@@ -434,6 +429,7 @@ function getIcon(node) {
   return '📁';
 }
 
+// ── Selection helpers ───────────────────────────────────────────
 function selectNode(node, labelEl) {
   document.querySelectorAll('.tree-label.active').forEach(el => el.classList.remove('active'));
   labelEl.classList.add('active');
@@ -482,6 +478,7 @@ function appendTerminal(message, type = 'info') {
   output.scrollTop = output.scrollHeight;
 }
 
+// Explicitly clean up text streams without altering DOM attributes
 function clearTerminal() {
   const output = document.getElementById('terminal-output-global');
   if (!output) return;
@@ -495,6 +492,7 @@ function getSelectedFolders() {
   return state.selectedNode ? [state.selectedNode] : [];
 }
 
+// Sync bulk choices context descriptions
 function updateSelectionSummary() {
   const summary = document.getElementById('selection-summary');
   if (!summary) return;
@@ -626,7 +624,6 @@ async function markFolderExecuted(tab) {
     });
     toast('Folder marked as executed successfully', 'success');
 
-    // Update in memory cache state dynamically
     const cachedNode = findNodeByPath(_cachedTreeData, report.folder_path);
     if (cachedNode) {
       cachedNode.scan_status = 'executed';
@@ -649,25 +646,35 @@ async function loadReport(folderPath, tab) {
   }
 }
 
+// CRITICAL FIX: showEmptyReport now leaves toolbars, action bars, headers, and terminals 100% visible.
 function showEmptyReport(tab, msg) {
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
-  const actionBar = document.getElementById(`action-bar`);
-  if (wrapper) wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>${escHtml(msg)}</p></div>`;
   const toolbarEl = document.getElementById(`toolbar-${tab}`);
-  if (toolbarEl) toolbarEl.style.display = 'none';
-  if (actionBar) {
-    actionBar.style.display = 'none';
-    if (actionBar.parentElement) actionBar.parentElement.style.display = 'none';
-  }
+  const titleEl = document.getElementById(`report-title-${tab}`);
+  const metaEl  = document.getElementById(`report-meta-${tab}`);
   
-  // FIX: Do not hard-hide the terminal layouts here as it drops the global logs panel out of view.
+  if (wrapper) {
+    wrapper.innerHTML = `
+      <div class="empty-state">
+        <div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div>
+        <p>${escHtml(msg)}</p>
+      </div>`;
+  }
+
+  // Ensure toolbars remain visible so actions and text layout contexts don't collapse
+  if (toolbarEl) toolbarEl.style.display = 'flex';
+  if (titleEl) titleEl.textContent = state.selectedNode ? `${state.selectedNode.name}` : 'No Folder Selected';
+  if (metaEl) metaEl.innerHTML = `<span class="stat-chip total">⚠️ Unscanned</span>`;
+
+  // Explicitly protect layout visibility boundaries 
+  syncPaneParentMargin();
 }
 
 // ── Render Report Table ──────────────────────────────────────────
 function renderReport(report, tab) {
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
   const toolbar = document.getElementById(`toolbar-${tab}`);
-  const actionBar = document.getElementById(`action-bar`);
+  const actionBar = document.getElementById('action-bar');
   const actionBarWrapper = actionBar ? actionBar.parentElement : null;
   const titleEl = document.getElementById(`report-title-${tab}`);
   const metaEl  = document.getElementById(`report-meta-${tab}`);
@@ -699,7 +706,7 @@ function renderReport(report, tab) {
 
   if (!report.entries || report.entries.length === 0) {
     wrapper.innerHTML = `<div class="empty-state"><div class="icon">${tab === 'cross' ? '🔀' : '🎬'}</div><p>No flagged files found in this folder. All files appear clean.</p></div>`;
-    if (actionBarWrapper) actionBarWrapper.style.display = 'none';
+    syncPaneParentMargin();
     return;
   }
 
@@ -814,6 +821,8 @@ function renderReport(report, tab) {
   });
 
   if (actionBar) actionBar.style.display = 'flex';
+  
+  syncPaneParentMargin();
 }
 
 function collectActions(tab) {
@@ -854,7 +863,6 @@ async function runExecute(tab, dryRun, actionFilter = null) {
     if (!dryRun) {
       toast(`Executed ${actions.length} action(s)`, 'success');
       
-      // Since disk structure changes on execution, pull down clean tracking properties from root tree context
       const tree = await api.get('/api/tree');
       _cachedTreeData = tree;
       restoreTreeState(tree);
@@ -895,12 +903,6 @@ async function startScan(isRescan = false, targetNode = null) {
   const mode = tab === 'cross' ? 'cross_quality' : 'within_folder';
   const actionLabel = isRescan ? 'Rescan' : 'Scan';
 
-  // FIX: Force ensure terminal layout components explicitly retain visual structural settings
-  const globalTerm = document.getElementById('terminal-global');
-  const globalResizer = document.getElementById('terminal-resizer');
-  if (globalTerm) globalTerm.style.display = 'block';
-  if (globalResizer) globalResizer.style.display = 'block';
-
   const scanBtn = document.getElementById('btn-scan-folder');
   if (scanBtn) scanBtn.disabled = true;
   appendTerminal(`=== ${actionLabel} started for ${selectedFolders.length} folder(s) (${tab}) ===`, 'info');
@@ -908,7 +910,7 @@ async function startScan(isRescan = false, targetNode = null) {
   if (!targetNode && selectedFolders.length > 1) {
     showEmptyReport(tab, `Scanning ${selectedFolders.length} selected folders…`);
   } else {
-    showEmptyReport(tab, '');
+    showEmptyReport(tab, 'Analyzing folders…');
   }
 
   const wrapper = document.getElementById(`table-wrapper-${tab}`);
@@ -920,12 +922,12 @@ async function startScan(isRescan = false, targetNode = null) {
       </div>`;
   }
 
+  syncPaneParentMargin();
+
   const jobs = selectedFolders.map((node) => runFolderScan(node, isRescan, mode));
   await Promise.all(jobs);
 
   if (scanBtn) scanBtn.disabled = false;
-  
-  // Re-render UI from the updated cache instead of hitting /api/tree endpoints over the network
   refreshTreeUI();
 }
 
@@ -963,7 +965,6 @@ async function runFolderScan(node, isRescan, mode) {
           if (msg.status === 'done') {
             finish(`✅ Scan complete for ${node.path}`);
             
-            // MUTATE CACHE LOCALLY: Update specific node flags inside our global cache reference directly
             const cachedNode = findNodeByPath(_cachedTreeData, node.path);
             if (cachedNode) {
               cachedNode.has_report = true;
@@ -993,18 +994,6 @@ async function runFolderScan(node, isRescan, mode) {
     appendTerminal(`❌ Failed to start scan for ${node.path}: ${e.message}`, 'error');
     return Promise.resolve();
   }
-}
-
-async function pollJob(jobId, tab) {
-  const INTERVAL = 1500;
-  const poll = async () => {
-    try {
-      const job = await api.get(`/api/scan/${jobId}`);
-      if (job.status === 'done' || job.status === 'error') return;
-      setTimeout(poll, INTERVAL);
-    } catch { /* ignore */ }
-  };
-  setTimeout(poll, INTERVAL);
 }
 
 // ── Config Modal ──────────────────────────────────────────────────
@@ -1249,9 +1238,27 @@ document.addEventListener('keydown', (e) => {
 function initResizers() {
   const terminalResizer = document.getElementById('terminal-resizer');
   const terminalGlobal = document.getElementById('terminal-global');
-  const paneParent = document.querySelector('.pane-parent');
 
-  if (terminalResizer && terminalGlobal && paneParent) {
+  if (terminalResizer && terminalGlobal) {
+    // Explicitly guarantee position rule boundaries upfront
+    terminalGlobal.style.display = 'block';
+    terminalGlobal.style.position = 'fixed';
+    terminalGlobal.style.bottom = '0px';
+    terminalGlobal.style.left = 'var(--sidebar-width, 260px)';
+    terminalGlobal.style.right = '0px';
+    terminalGlobal.style.zIndex = '999';
+
+    terminalResizer.style.display = 'block';
+    terminalResizer.style.position = 'fixed';
+    terminalResizer.style.left = 'var(--sidebar-width, 260px)';
+    terminalResizer.style.right = '0px';
+    terminalResizer.style.zIndex = '1000';
+
+    const initialHeight = localStorage.getItem('terminal-preferred-height') || '220';
+    terminalGlobal.style.height = `${initialHeight}px`;
+    terminalResizer.style.bottom = `${initialHeight}px`;
+    document.documentElement.style.setProperty('--terminal-height', `${initialHeight}px`);
+
     terminalResizer.addEventListener('mousedown', (e) => {
       e.preventDefault();
       terminalResizer.classList.add('active');
@@ -1260,21 +1267,22 @@ function initResizers() {
 
       const startHeight = terminalGlobal.getBoundingClientRect().height;
       const startY = e.clientY;
-      const panelHeight = document.querySelector('.panel-right').getBoundingClientRect().height;
 
       const doDrag = (moveEvent) => {
         const deltaY = startY - moveEvent.clientY;
         let newHeight = startHeight + deltaY;
-        const minHeight = 120;
-        const maxHeight = panelHeight - 200;
+        
+        const minHeight = 100;
+        const maxHeight = window.innerHeight - 150;
 
         if (newHeight < minHeight) newHeight = minHeight;
         if (newHeight > maxHeight) newHeight = maxHeight;
 
         terminalGlobal.style.height = `${newHeight}px`;
-        document.documentElement.style.setProperty('--terminal-height', `${newHeight}px`);
-        paneParent.style.marginBottom = `0px`;
         terminalResizer.style.bottom = `${newHeight}px`;
+        document.documentElement.style.setProperty('--terminal-height', `${newHeight}px`);
+        localStorage.setItem('terminal-preferred-height', newHeight);
+        syncPaneParentMargin();
       };
 
       const stopDrag = () => {
@@ -1291,20 +1299,37 @@ function initResizers() {
   }
 }
 
-// Sync pane-parent margin-bottom to match current terminal height
+// Strictly locks element rendering states so UI components can never drop below view folds
 function syncPaneParentMargin() {
   const terminalGlobal = document.getElementById('terminal-global');
+  const terminalResizer = document.getElementById('terminal-resizer');
   const paneParent = document.querySelector('.pane-parent');
-  if (terminalGlobal && paneParent) {
-    paneParent.style.marginBottom = `0px`;
+  
+  if (terminalGlobal && terminalGlobal.style.display !== 'none') {
+    const currentHeight = terminalGlobal.getBoundingClientRect().height || 220;
+    
+    terminalGlobal.style.display = 'block';
+    terminalGlobal.style.position = 'fixed';
+    terminalGlobal.style.bottom = '0px';
+    
+    if (terminalResizer) {
+      terminalResizer.style.display = 'block';
+      terminalResizer.style.position = 'fixed';
+      terminalResizer.style.bottom = `${currentHeight}px`;
+    }
+    
+    if (paneParent) {
+      paneParent.style.paddingBottom = `${currentHeight + 20}px`;
+      paneParent.style.marginBottom = '0px';
+    }
   }
 }
 
 // ── Init ──────────────────────────────────────────────────────────
 async function init() {
   await checkHealth();
-  await loadTree();
   initResizers();
+  await loadTree();
   syncPaneParentMargin();
   setInterval(checkHealth, 30_000);
 }
