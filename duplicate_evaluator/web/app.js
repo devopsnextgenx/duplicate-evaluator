@@ -280,21 +280,16 @@ function renderTree(nodes, parentEl, depth) {
 
     let dotHtml = '';
     let rescanHtml = '';
-    let issueHtml = '';
     if (node.type === 'actress') {
       const status = node.scan_status || 'none';
       dotHtml = `<span class="scan-status-dot ${status}" title="Status: ${status}"></span>`;
       rescanHtml = `<button class="rescan-btn" title="Rescan folder">🔄</button>`;
-      if (node.has_alert) {
-        issueHtml = `<span class="tree-alert-icon" title="Report contains duplicate or delete suggestions">🔴</span>`;
-      }
     }
 
     label.innerHTML = `
       ${dotHtml}
       <span class="icon">${icon}</span>
       <span class="name" title="${escHtml(node.path)}">${escHtml(node.name)}</span>
-      ${issueHtml}
       ${node.type === 'actress' ? `<span class="tree-badge ${node.has_report ? 'has-report' : ''}">${node.mp4_count ?? 0}</span>` : ''}
       ${rescanHtml}
     `;
@@ -1493,10 +1488,18 @@ function syncPaneParentMargin() {
   const terminalGlobal = document.getElementById('terminal-global');
   const terminalResizer = document.getElementById('terminal-resizer');
   const paneParent = document.querySelector('.pane-parent');
+  const terminalOutput = document.getElementById('terminal-output-global');
+  const actionBar = document.getElementById('action-bar');
+  const terminalHeader = document.querySelector('.terminal-header');
   
   if (terminalGlobal && terminalGlobal.style.display !== 'none') {
     const currentHeight = terminalGlobal.getBoundingClientRect().height || 220;
-    
+    const headerHeight = terminalHeader ? terminalHeader.getBoundingClientRect().height : 0;
+    const actionBarHeight = actionBar && actionBar.style.display !== 'none'
+      ? actionBar.getBoundingClientRect().height
+      : 0;
+    const outputHeight = Math.max(0, currentHeight - headerHeight - actionBarHeight);
+
     terminalGlobal.style.display = 'block';
     terminalGlobal.style.position = 'fixed';
     terminalGlobal.style.bottom = '30px';
@@ -1505,6 +1508,10 @@ function syncPaneParentMargin() {
       terminalResizer.style.display = 'block';
       terminalResizer.style.position = 'fixed';
       terminalResizer.style.bottom = `${currentHeight+30}px`;
+    }
+
+    if (terminalOutput) {
+      terminalOutput.style.height = `${outputHeight}px`;
     }
     
     if (paneParent) {
@@ -1522,6 +1529,8 @@ async function init() {
   syncPaneParentMargin();
   setInterval(checkHealth, 30_000);
 }
+
+window.addEventListener('resize', syncPaneParentMargin);
 
 // Ensure init runs after DOM is ready (handles reloads reliably)
 window.addEventListener('DOMContentLoaded', init);
