@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -114,3 +115,28 @@ class TestBuildFolderTree:
     def test_nonexistent_root(self, tmp_path: Path):
         tree = build_folder_tree(str(tmp_path / "doesnotexist"))
         assert "error" in tree
+
+    def test_actress_alert_flag_for_duplicate_or_delete(self, sample_media_root: Path):
+        report_folder = sample_media_root / "Hindi" / "hd" / "Actress1"
+        report_data = {
+            "folder_path": str(report_folder),
+            "language": "Hindi",
+            "quality": "hd",
+            "actress": "Actress1",
+            "entries": [
+                {"file": {"filename": "SongOne.mp4", "path": str(report_folder / "SongOne.mp4")}, "is_duplicate": True, "suggested_action": "delete"},
+                {"file": {"filename": "song_two.mp4", "path": str(report_folder / "song_two.mp4")}, "is_duplicate": False, "suggested_action": "keep"},
+            ],
+            "created_at": "2026-01-01T00:00:00Z",
+            "llm_model": "test-model",
+            "total_files_scanned": 2,
+        }
+        (report_folder / "_report.json").write_text(json.dumps(report_data), encoding="utf-8")
+
+        tree = build_folder_tree(str(sample_media_root))
+        hindi = next(c for c in tree["children"] if c["name"] == "Hindi")
+        hd = next(c for c in hindi["children"] if c["name"] == "hd")
+        actress = hd["children"][0]
+
+        assert actress["has_report"] is True
+        assert actress["has_alert"] is True

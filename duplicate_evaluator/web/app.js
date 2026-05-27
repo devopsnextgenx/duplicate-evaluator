@@ -280,16 +280,21 @@ function renderTree(nodes, parentEl, depth) {
 
     let dotHtml = '';
     let rescanHtml = '';
+    let issueHtml = '';
     if (node.type === 'actress') {
       const status = node.scan_status || 'none';
       dotHtml = `<span class="scan-status-dot ${status}" title="Status: ${status}"></span>`;
       rescanHtml = `<button class="rescan-btn" title="Rescan folder">🔄</button>`;
+      if (node.has_alert) {
+        issueHtml = `<span class="tree-alert-icon" title="Report contains duplicate or delete suggestions">🔴</span>`;
+      }
     }
 
     label.innerHTML = `
       ${dotHtml}
       <span class="icon">${icon}</span>
       <span class="name" title="${escHtml(node.path)}">${escHtml(node.name)}</span>
+      ${issueHtml}
       ${node.type === 'actress' ? `<span class="tree-badge ${node.has_report ? 'has-report' : ''}">${node.mp4_count ?? 0}</span>` : ''}
       ${rescanHtml}
     `;

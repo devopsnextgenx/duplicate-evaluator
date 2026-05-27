@@ -317,6 +317,13 @@ h3 {
   color: var(--accent-green);
 }
 
+.tree-alert-icon {
+  margin-left: 0.45rem;
+  font-size: 0.95rem;
+  color: var(--accent-red);
+  flex-shrink: 0;
+}
+
 .tree-chevron {
   font-size: 0.6em;
   color: var(--text-muted);

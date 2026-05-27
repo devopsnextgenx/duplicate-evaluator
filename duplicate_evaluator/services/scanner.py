@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -140,12 +141,18 @@ def _scan_actress_dir(actress_dir: Path, lang_name: str, quality_name: str) -> d
             except Exception:
                 pass
 
+        has_alert = False
+        if has_report:
+            report_path = actress_dir / "_report.json"
+            has_alert = _report_contains_alert(report_path)
+
         return {
             "name": actress_dir.name,
             "path": str(actress_dir),
             "type": "actress",
             "mp4_count": mp4_count,
             "has_report": has_report,
+            "has_alert": has_alert,
             "scan_status": scan_status,
             "language": lang_name,
             "quality": quality_name,
@@ -162,6 +169,22 @@ def _scan_actress_dir(actress_dir: Path, lang_name: str, quality_name: str) -> d
             "language": lang_name,
             "quality": quality_name,
         }
+
+
+def _report_contains_alert(report_path: Path) -> bool:
+    """Return True if the report contains duplicates or delete suggestions."""
+    try:
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+        for entry in data.get("entries", []):
+            if entry.get("is_duplicate"):
+                return True
+            if entry.get("deleted"):
+                return True
+            if entry.get("suggested_action") == "delete":
+                return True
+        return False
+    except Exception:
+        return False
 
 
 def build_folder_tree(media_root: str) -> dict:
